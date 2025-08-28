@@ -23,7 +23,7 @@ void moveToTrash(const fs::path& filePath) {
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
-        std::cerr << "Usage: compare_kif <folder_a> <folder_b>\n";
+        std::cerr << "Usage: compare_kif <folder_a> <folder_b>\n From folder_b, duplicated files will be deleted.\n";
         return 1;
     }
     fs::path folderA = argv[1];
