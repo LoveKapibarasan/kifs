@@ -19,9 +19,23 @@ else
     exit 1
 fi
 
-# Compile organize_kif and compare_kif if not present
-[ ! -x ./organize_kif ] && [ -f organize_kif.cpp ] && g++ -O2 -o organize_kif organize_kif.cpp
-[ ! -x ./compare_kif ] && [ -f compare_kif.cpp ] && g++ -O2 -o compare_kif compare_kif.cpp
+# Ensure json.hpp exists
+if [ ! -f json.hpp ]; then
+    echo "json.hpp not found. Running install_json.sh..."
+    ./install_json.sh || { echo "Failed to install json.hpp"; exit 1; }
+fi
+
+# Compile organize_kif if missing
+if [ ! -x ./organize_kif ] && [ -f organize_kif.cpp ]; then
+    echo "Compiling organize_kif..."
+    g++ -std=c++17 -O2 -o organize_kif organize_kif.cpp
+fi
+
+# Compile compare_kif if missing
+if [ ! -x ./compare_kif ] && [ -f compare_kif.cpp ]; then
+    echo "Compiling compare_kif..."
+    g++ -std=c++17 -O2 -o compare_kif compare_kif.cpp
+fi
 
 # Check if all files in TARGET start with "*#"
 for f in "$TARGET"/*; do
@@ -37,6 +51,7 @@ else
     echo "Unparsed file(s) found"
 fi
 
+# Do not process literal *.zip
 shopt -s nullglob
 
 # Process only zip files that contain .kif files
@@ -59,3 +74,5 @@ done
 
 ./compare_kif "$HOME/kifs/Evaluation/evaluated_kif" "$TARGET"
 ./compare_kif "$HOME/kifs/Evaluation/evaluated_kif_24" "$TARGET"
+
+

@@ -15,15 +15,16 @@ void collectFiles(const fs::path& root, std::unordered_set<std::string>& files) 
     }
 }
 
-// Move file to trash (Linux)
-void moveToTrash(const fs::path& filePath) {
-    std::string cmd = "gio trash '" + filePath.string() + "'";
+// Permanently remove file using rm
+void removeFile(const fs::path& filePath) {
+    std::string cmd = "rm -f '" + filePath.string() + "'";
     std::system(cmd.c_str());
 }
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
-        std::cerr << "Usage: compare_kif <folder_a> <folder_b>\n From folder_b, duplicated files will be deleted.\n";
+        std::cerr << "Usage: compare_kif <folder_a> <folder_b>\n"
+                  << " From folder_b, duplicated files will be deleted.\n";
         return 1;
     }
     fs::path folderA = argv[1];
@@ -42,7 +43,7 @@ int main(int argc, char* argv[]) {
             std::string fname = entry.path().filename().string();
             if (filesA.count(fname)) {
                 std::cout << "Removing: " << entry.path() << "\n";
-                moveToTrash(entry.path());
+                removeFile(entry.path());
                 ++removed;
             }
         }

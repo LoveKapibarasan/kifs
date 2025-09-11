@@ -27,7 +27,8 @@ std::optional<json> findSetting(const std::string& filename, const json& setting
     for (const auto& entry : settings) {
         std::regex pattern(entry["pattern"].get<std::string>());
         if (std::regex_match(filename, pattern)) {
-            return entry;
+            return std::make_optional(entry);
+
         }
     }
     return std::nullopt;
