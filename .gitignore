@@ -1,3 +1,10 @@
+compare_kif
+organize_kif
+json.hpp
+node_modules/
+.env
+**.pkl
+util.sh
 ### AL ###
 #Template for AL projects for Dynamics 365 Business Central
 #launch.json folder

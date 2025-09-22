@@ -1,0 +1,8 @@
+[Unit]
+Description=Run wrapper.sh to fetch & analyze shogi kifu
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/<USER>/kifs/service
+ExecStart=/home/<USER>/kifs/service/wrapper.sh
+TimeoutStartSec=8h
