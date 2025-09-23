@@ -4,5 +4,6 @@ Description=Schedule wrapper.sh nightly
 [Timer]
 OnCalendar=*-*-* 21:00:00
 Persistent=true
+Unit=toggle-analysis.service
 [Install]
 WantedBy=timers.target
