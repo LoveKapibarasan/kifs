@@ -20,7 +20,7 @@ systemctl --user disable --now analysis.service
 
 read -p "Enter username: " username
 
-replace_vars  "${SERVICE_NAME}" "$username"
+allow_nopass "${wrapper}" "${username}"
 
 copy_user_service_files "$BASE_NAME" "$SERVICE_DIR"
 

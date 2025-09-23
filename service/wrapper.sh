@@ -16,6 +16,9 @@ if [ -f .env ]; then
   export $(grep -v '^#' .env | xargs)
 fi
 
+docker stop pihole
+systemctl stop pihole
+
 # --- 1. メールからKIFを取得 ---
 "$SCRIPT_DIR/../mail/venv/bin/python" "$SCRIPT_DIR/../mail/dl.py"
 echo "E-mail finish"
@@ -23,6 +26,10 @@ echo "E-mail finish"
 # --- 2. shogi-extend 側の処理 ---
 "$SCRIPT_DIR/../shogi-extend/venv/bin/python" "$SCRIPT_DIR/../shogi-extend/dl.py"
 echo "Shogi-Entend finish"
+
+systemctl start pihole
+docker start pihole
+
 
 # --- 3. Run script.sh ---
 "$SCRIPT_DIR/../script.sh
