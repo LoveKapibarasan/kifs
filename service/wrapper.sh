@@ -29,9 +29,11 @@ echo "Shogi-Entend done"
 disable_resolved
 
 # --- 3. Run script.sh ---
-"$SCRIPT_DIR/../script.sh
+"$SCRIPT_DIR/../script.sh"
 
 # --- 4. 将棋アプリでバッチ解析 ---
-${USER_HOME}/ShogiHome*.AppImage \
+"$USER_HOME"/ShogiHome*.AppImage \
   --batch-analysis "$KIF_PATH" \
   "$ENGINE_URI"
+
+echo "Shogi-Entend done"

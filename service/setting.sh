@@ -8,6 +8,11 @@ SERVICE_TIMER=analysis.timer
 # import functions
 . ../util.sh
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Venv
+create_venv "${SCRIPT_DIR}/../mail/"
+create_venv "${SCRIPT_DIR}/../shogi-extend/"
+
 # Reset the service
 reset_user_service "${SERVICE_NAME}"
 reset_user_timer "${SERVICE_TIMER}"
