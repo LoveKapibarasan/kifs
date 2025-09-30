@@ -3,7 +3,9 @@
 if [[ ! -f "${HOME}/Linux_device_manager/util.sh" ]]; then
     echo "This requires Linux_device_manager repository"
     exit 1
-
-if [[ -f "${HOME}/kifs/util.sh" ]]; then
+fi
+if [[ ! -f "${HOME}/kifs/util.sh" ]]; then
     ln -s "${HOME}/Linux_device_manager/util.sh" "${HOME}/kifs/util.sh"
+else
+    echo "util.sh already exists."
 fi

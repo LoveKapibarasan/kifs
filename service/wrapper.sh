@@ -1,11 +1,10 @@
 #!/bin/bash
-set -euo pipefail
 
 # import functions
-. ../util.sh
+source ../util.sh
 
 USER_HOME=$(get_user_home)
-
+root_check
 
 # スクリプトのディレクトリを取得
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -16,20 +15,18 @@ if [ -f .env ]; then
   export $(grep -v '^#' .env | xargs)
 fi
 
-docker stop pihole
-systemctl stop pihole
+enable_resolved
 
 # --- 1. メールからKIFを取得 ---
 "$SCRIPT_DIR/../mail/venv/bin/python" "$SCRIPT_DIR/../mail/dl.py"
-echo "E-mail finish"
+echo "E-mail done"
 
 # --- 2. shogi-extend 側の処理 ---
 "$SCRIPT_DIR/../shogi-extend/venv/bin/python" "$SCRIPT_DIR/../shogi-extend/dl.py"
-echo "Shogi-Entend finish"
 
-systemctl start pihole
-docker start pihole
+echo "Shogi-Entend done"
 
+disable_resolved
 
 # --- 3. Run script.sh ---
 "$SCRIPT_DIR/../script.sh
