@@ -42,6 +42,8 @@ for user in $NORMAL_USER; do
 	echo "script.sh done."
 
 	# --- 4. 将棋アプリでバッチ解析 ---
+	
+	sudo chown -R "${user}:${user}" "$KIF_PATH"
 	su "$user" -c "\"$USER_HOME\"/ShogiHome*.AppImage --batch-analysis \"$KIF_PATH\" \"$ENGINE_URI\""
 	echo "Shogi Analysis done"
 done
