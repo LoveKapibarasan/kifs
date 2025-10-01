@@ -50,7 +50,7 @@ done
 
 # Run organize_kif only on parsed files
 if [ "$(ls -A "$TARGET")" ]; then
-    ./organize_kif
+    "$SCRIPT_DIR/organize_kif"  || { echo "Failed to run organize kif"; exit 1; }
 else
     echo "No valid KIF files to organize"
 fi
@@ -80,5 +80,11 @@ for z in "$HOME"/Downloads/*.zip; do
     fi
 done
 
-./compare_kif "$HOME/kifs/Evaluation/evaluated_kif" "$TARGET"
-./compare_kif "$HOME/kifs/Evaluation/evaluated_kif_24" "$TARGET"
+
+for kif in "$HOME"/Downloads/*.kif; do
+    [ -e "$kif" ] || continue   # skip if no .kif files
+    mv "$kif" "$TARGET"
+done
+
+"$SCRIPT_DIR/compare_kif" "$HOME/kifs/Evaluation/evaluated_kif" "$TARGET"
+"$SCRIPT_DIR/compare_kif" "$HOME/kifs/Evaluation/evaluated_kif_24" "$TARGET"

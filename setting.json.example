@@ -1,0 +1,20 @@
+[
+  {
+    "name": "24",
+    "player": "komasan88",
+    "pattern": "^\\d+_(\\d{4})_.*\\.kif$",
+    "output_path": "Evaluation/evaluated_kif_24"
+  },
+  {
+    "name": "wars",
+    "player": "Love_Kapibara",
+    "pattern": "^.*?(\\d{8})_.*?\\.kif$",
+    "output_path": "Evaluation/evaluated_kif"
+  },
+    {
+    "name": "chess_com",
+    "player": "Love_Kapibarasan",
+    "pattern": "^\\d+-.*-(\\d{4}-\\d{2}-\\d{2})\\.pgn$",
+    "output_path": "Evaluation/evaluated_pgn"
+  }
+]
