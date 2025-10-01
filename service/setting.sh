@@ -6,7 +6,7 @@ SERVICE_TIMER=analysis.timer
 
 
 # import functions
-. ../util.sh
+source ../util.sh
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Venv

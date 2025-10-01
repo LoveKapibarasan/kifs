@@ -3,6 +3,8 @@ organize_kif
 json.hpp
 node_modules/
 .env
+venv/
+.venv/
 **.pkl
 util.sh
 ### AL ###
