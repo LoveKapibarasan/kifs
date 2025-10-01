@@ -38,7 +38,7 @@ try:
     )
     reserve_button.click()
 
-    print("棋譜取得の予約を送信しました ✅")
+    print("棋譜取得の予約を送信しました")
 
 finally:
     driver.quit()  # 自動で閉じたいときだけ有効化

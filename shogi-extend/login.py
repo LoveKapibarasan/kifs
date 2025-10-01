@@ -41,7 +41,7 @@ def get_logged_in_driver():
     """return logined Selenium driver"""
     create_profile()
     options = webdriver.ChromeOptions()
-    options.add_argument("--headless=new") 
+    options.add_argument("--headless=new") # comment out this line for debugging
     options.add_argument(f"--user-data-dir={PROFILE_DIR}")
     driver = webdriver.Chrome(service=Service(), options=options)
 

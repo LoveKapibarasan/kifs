@@ -29,6 +29,7 @@ int main(int argc, char* argv[]) {
     }
     fs::path folderA = argv[1];
     fs::path folderB = argv[2];
+    std::cout << "Conmparing " << folderA << " with " << folderB << "\n";
     if (!fs::is_directory(folderA) || !fs::is_directory(folderB)) {
         std::cerr << "Both arguments must be folders.\n";
         return 1;
