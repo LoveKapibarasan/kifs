@@ -6,7 +6,7 @@ shopt -s nullglob
 TARGET="$HOME/kifs/Evaluation/input"
 TMPDIR="$HOME/tmp/kif_extract"
 UNPARSED="$HOME/tmp/unparsed_kif"
-
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$TARGET"
 mkdir -p "$UNPARSED"
 
@@ -23,7 +23,7 @@ fi
 # Ensure json.hpp exists
 if [ ! -f json.hpp ]; then
     echo "json.hpp not found. Running install_json.sh..."
-    ./install_json.sh || { echo "Failed to install json.hpp"; exit 1; }
+    "$SCRIPT_DIR/../install_json.sh" || { echo "Failed to install json.hpp"; exit 1; }
 fi
 
 # Compile organize_kif if missing

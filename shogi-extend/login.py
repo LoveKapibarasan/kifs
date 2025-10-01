@@ -15,6 +15,16 @@ HOME_URL = "https://www.shogi-extend.com/"
 load_dotenv()
 EMAIL = os.getenv("SHOGI_EMAIL")
 PASSWORD = os.getenv("SHOGI_PASSWORD")
+PROFILE_DIR = os.path.expanduser("~/chrome-shogi-profile")
+
+def create_profile():
+    """専用のChromeプロファイルディレクトリを作成"""
+    if not os.path.exists(PROFILE_DIR):
+        os.makedirs(PROFILE_DIR)
+        print(f"Created Chrome profile directory at {PROFILE_DIR}")
+    else:
+        print(f"Using existing Chrome profile directory: {PROFILE_DIR}")
+
 
 def save_cookies(driver, path):
     with open(path, "wb") as f:
@@ -24,25 +34,26 @@ def load_cookies(driver, path):
     with open(path, "rb") as f:
         cookies = pickle.load(f)
         for cookie in cookies:
-            cookie.pop("expiry", None)  # expiry が float の場合エラー回避
+            cookie.pop("expiry", None)
             driver.add_cookie(cookie)
 
 def get_logged_in_driver():
-    """ログイン済み Selenium driver を返す"""
+    """return logined Selenium driver"""
+    create_profile()
     options = webdriver.ChromeOptions()
-     # options.add_argument("--headless=new") 
-    options.add_argument("--start-maximized")
+    options.add_argument("--headless=new") 
+    options.add_argument(f"--user-data-dir={PROFILE_DIR}")
     driver = webdriver.Chrome(service=Service(), options=options)
 
     if os.path.exists(COOKIE_FILE):
-        # Cookie ロード
+        # load Cookie
         driver.get(HOME_URL)
         load_cookies(driver, COOKIE_FILE)
         driver.refresh()
-        print("セッションを復元しました ✅")
+        print("Session is restored.")
 
     else:
-        # 初回ログイン
+        # Login
         driver.get(LOGIN_URL)
 
         WebDriverWait(driver, 10).until(
@@ -62,7 +73,7 @@ def get_logged_in_driver():
         )
 
         save_cookies(driver, COOKIE_FILE)
-        print("ログインして Cookie を保存しました ✅")
+        print("New session is saved.")
 
     return driver
 

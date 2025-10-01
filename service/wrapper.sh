@@ -19,25 +19,27 @@ fi
 enable_resolved
 sleep 5
 
-
-# --- 1. メールからKIFを取得 ---
-"$SCRIPT_DIR/../mail/venv/bin/python" "$SCRIPT_DIR/../mail/dl.py"
-echo "E-mail done"
-
-# --- 2. shogi-extend 側の処理 ---
-"$SCRIPT_DIR/../shogi-extend/venv/bin/python" "$SCRIPT_DIR/../shogi-extend/dl.py"
-
-echo "Shogi-Extend done"
-
-disable_resolved
-
-# --- 3. Run script.sh ---
-"$SCRIPT_DIR/../script.sh"
-
-# --- 4. 将棋アプリでバッチ解析 ---
+echo "Normal users list = ${NORMAL_USER}"
 for user in $NORMAL_USER; do
-  su - "$user" -c "\"$USER_HOME\"/ShogiHome*.AppImage \
-    --batch-analysis \"$KIF_PATH\" \"$ENGINE_URI\""
+	echo "Processing user = $user"
+	HOME=$(eval echo "~$user")
+	# --- 1. メールからKIFを取得 ---
+	"$SCRIPT_DIR/../mail/venv/bin/python" "$SCRIPT_DIR/../mail/dl.py"
+	echo "E-mail done."
+
+	# --- 2. shogi-extend 側の処理 ---
+	"$SCRIPT_DIR/../shogi-extend/venv/bin/python" "$SCRIPT_DIR/../shogi-extend/dl.py"
+	echo "Shogi-Extend done."
+
+	# --- 3. Run script.sh ---
+	cd ..
+	./script.sh
+	cd -
+	echo "script.sh done."
+
+	# --- 4. 将棋アプリでバッチ解析 ---
+	su "$user" -c "\"$USER_HOME\"/ShogiHome*.AppImage --batch-analysis \"$KIF_PATH\" \"$ENGINE_URI\""
+	echo "Shogi Analysis done"
 done
 
-echo "Shogi Analysis done"
+disable_resolved
