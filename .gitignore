@@ -9,7 +9,6 @@ __pycache__
 __pycache__/
 **.pkl
 util.sh
-setting.json
 ### AL ###
 #Template for AL projects for Dynamics 365 Business Central
 #launch.json folder

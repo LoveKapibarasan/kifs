@@ -3,32 +3,38 @@
 BASE_NAME=analysis
 SERVICE_NAME=analysis.service
 SERVICE_TIMER=analysis.timer
-
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # import functions
-source ../util.sh
+UTIL_PATH="${SCRIPT_DIR}/../util.sh"
+source "$UTIL_PATH"
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# Venv
+root_check
+
+echo "Creating venv."
 create_venv "${SCRIPT_DIR}/../mail/"
 create_venv "${SCRIPT_DIR}/../shogi-extend/"
 
-# Reset the service
-reset_user_service "${SERVICE_NAME}"
-reset_user_timer "${SERVICE_TIMER}"
+echo "Reset the service."
+reset_service "${SERVICE_NAME}"
+reset_timer "${SERVICE_TIMER}"
 
-USER_HOME=$(get_user_home)
+echo "Creating /opt/kifs/ directory"
+mkdir -p /opt/kifs/
+    
+echo "Creating symbolic link to /opt"
+ln -sf "${SCRIPT_DIR}/wrapper.sh" /opt/kifs/wrapper.sh
 
-# タイマーとサービスを無効化 & 停止
-systemctl --user disable --now analysis.timer
-systemctl --user disable --now analysis.service
+echo "Copying service files"
+cp "${SCRIPT_DIR}/${SERVICE_NAME}" /etc/systemd/system/
+cp "${SCRIPT_DIR}/${SERVICE_TIMER}" /etc/systemd/system/
 
-read -p "Enter username: " username
+echo "Reloading systemd"
+systemctl daemon-reload
 
-allow_nopass "${wrapper}" "${username}"
+echo "Starting services"
+start_service "${SERVICE_NAME}"
+start_timer "${SERVICE_TIMER}"
 
-copy_user_service_files "$BASE_NAME" "$SERVICE_DIR"
-
-# Start the service
-start_user_service "${SERVICE_NAME}"
-start_user_timer "${SERVICE_TIMER}"
+echo ""
+echo "Setup completed!"

@@ -21,9 +21,9 @@ else
 fi
 
 # Ensure json.hpp exists
-if [ ! -f json.hpp ]; then
+if [ ! -f "${SCRIPT_DIR}/json.hpp" ]; then
     echo "json.hpp not found. Running install_json.sh..."
-    "$SCRIPT_DIR/../install_json.sh" || { echo "Failed to install json.hpp"; exit 1; }
+    "$SCRIPT_DIR/install_json.sh" || { echo "Failed to install json.hpp"; exit 1; }
 fi
 
 # Compile organize_kif if missing
