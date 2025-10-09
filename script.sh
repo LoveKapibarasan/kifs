@@ -27,39 +27,31 @@ if [ ! -f "${SCRIPT_DIR}/json.hpp" ]; then
 fi
 
 # Compile organize_kif if missing
-if [ ! -x ./organize_kif ] && [ -f organize_kif.cpp ]; then
+if [ ! -f "${SCRIPT_DIR}/organize_kif" ]; then
     echo "Compiling organize_kif..."
-    g++ -std=c++17 -O2 -o organize_kif organize_kif.cpp
+    g++ -std=c++17 -O2 -o "${SCRIPT_DIR}/organize_kif" "${SCRIPT_DIR}/organize_kif.cpp"
 fi
 
 # Compile compare_kif if missing
-if [ ! -x ./compare_kif ] && [ -f compare_kif.cpp ]; then
+if [ ! -f "${SCRIPT_DIR}/compare_kif" ]; then
     echo "Compiling compare_kif..."
-    g++ -std=c++17 -O2 -o compare_kif compare_kif.cpp
+    g++ -std=c++17 -O2 -o "${SCRIPT_DIR}/compare_kif" "${SCRIPT_DIR}/compare_kif.cpp"
 fi
 
 # Move unparsed files (files not starting with "*#") into a temporary folder
-moved_any=false
 for f in "$TARGET"/*; do
     if ! $CONVERT "$f" 2>/dev/null | grep -q '^\*#'; then
         echo "Unparsed: $(basename "$f") → $UNPARSED"
         mv "$f" "$UNPARSED/"
-        moved_any=true
     fi
 done
 
-# Run organize_kif only on parsed files
-if [ "$(ls -A "$TARGET")" ]; then
-    "$SCRIPT_DIR/organize_kif"  || { echo "Failed to run organize kif"; exit 1; }
-else
-    echo "No valid KIF files to organize"
-fi
+# Run organize_kif .    
+"$SCRIPT_DIR/organize_kif"
 
 # Restore unparsed files back into the input folder
-if [ "$moved_any" = true ]; then
-    echo "Restoring unparsed files..."
-    mv "$UNPARSED"/* "$TARGET"/ 2>/dev/null || true
-fi
+echo "Restoring unparsed files..."
+mv "$UNPARSED"/* "$TARGET"/ 2>/dev/null || true
 
 
 # Process only zip files that contain .kif files

@@ -8,8 +8,9 @@
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
-const std::string INPUT_FOLDER = "Evaluation/input";
-const std::string SETTING_FILE = "setting.json";
+const std::string HOME_DIR = std::getenv("HOME");
+const std::string INPUT_FOLDER = fs::path(HOME_DIR) / "kifs" / "Evaluation" / "input";
+const std::string SETTING_FILE = fs::path(HOME_DIR) / "kifs" / "setting.json";
 
 // Load settings from JSON file
 json loadSettings() {

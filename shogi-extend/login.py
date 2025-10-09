@@ -7,7 +7,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from dotenv import load_dotenv
 
-COOKIE_FILE = "shogi_cookies.pkl"
+COOKIE_FILE =  os.path.expanduser("~/kifs/service/shogi_cookies.pkl")
 LOGIN_URL = "https://www.shogi-extend.com/xusers/sign_in"
 HOME_URL = "https://www.shogi-extend.com/"
 

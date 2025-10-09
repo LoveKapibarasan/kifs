@@ -3,18 +3,17 @@ from dotenv import load_dotenv
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from login import get_logged_in_driver  # 先ほど作った関数
-
-# --- .env 読み込み ---
+from login import get_logged_in_driver  
+from load_kif import set_initial_value
 load_dotenv()
 SWARS_ID = os.getenv("SWARS_ID")
 
 driver = get_logged_in_driver()
 
 try:
+    set_initial_value(driver)     
     driver.get("https://www.shogi-extend.com/lab/swars/crawler-batch")
     wait = WebDriverWait(driver, 30)
-
     # --- 将棋ウォーズIDを入力 ---
     swars_id_input = wait.until(
         EC.presence_of_element_located((By.ID, "form_part-swars_user_key"))
