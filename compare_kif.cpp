@@ -14,11 +14,14 @@ void collectFiles(const fs::path& root, std::unordered_set<std::string>& files) 
         }
     }
 }
-
-// Permanently remove file using rm
+// Permanently remove file using filesystem (safer than system())
 void removeFile(const fs::path& filePath) {
-    std::string cmd = "rm -f '" + filePath.string() + "'";
-    std::system(cmd.c_str());
+    try {
+        fs::remove(filePath);
+        std::cout << "Removed: " << filePath << std::endl;
+    } catch (const fs::filesystem_error& e) {
+        std::cerr << "Error removing " << filePath << ": " << e.what() << std::endl;
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -29,7 +32,7 @@ int main(int argc, char* argv[]) {
     }
     fs::path folderA = argv[1];
     fs::path folderB = argv[2];
-    std::cout << "Conmparing " << folderA << " with " << folderB << "\n";
+    std::cout << "Comparing " << folderA << " with " << folderB << "\n";
     if (!fs::is_directory(folderA) || !fs::is_directory(folderB)) {
         std::cerr << "Both arguments must be folders.\n";
         return 1;
