@@ -1,0 +1,53 @@
+<gameAnalysis>
+  <kifu>$START_TIME:2025/10/17 03:14:06
+$EVENT:将棋ウォーズ(3分切れ負け スプリント)
+N+Love_Kapibara 四段
+N-GRS2013 三段
+P1-KY-KE *  *  *  *  * -KE-KY
+P2 *  *  *  * -KI-GI-KI-OU * 
+P3 *  *  *  *  * -FU-GI * -FU
+P4-FU-HI *  *  *  *  * -FU * 
+P5 *  * +FU * +KA+FU *  *  * 
+P6+FU-FU+GI *  *  * +FU *  * 
+P7 * -GI *  * +FU *  *  * +FU
+P8 *  * +OU+KI * +HI * +FU * 
+P9+KY+KE+KI *  *  *  * +KE+KY
+P+00KA00FU00FU
+P-00FU00FU00FU00FU
++
++7869OU,T1
+-0078FU,T6
+'△手筋：たたきの歩, 歩裏の歩
+%CHUDAN,T0
+</kifu>
+  <scoreList>
+  </scoreList>
+  <engineName>YaneuraOu NNUE V9.00Git 64ZEN1 TOURNAMENT</engineName>
+  <timePerMove>5</timePerMove>
+  <analysisScoreList>-326,3837,-3552</analysisScoreList>
+  <analysisInfoList>
+    <analysisInfo>
+      <move>Starting Position</move>
+      <score>
+      </score>
+      <pv>
+      </pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   1  K7h-6i</move>
+      <score>-326</score>
+      <bound>--</bound>
+      <pv>K7h-7g P*7c</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   2  P*7h</move>
+      <score>-3837</score>
+      <pv>S8gx7f+ K6i-5h P*7c P*8b R8d-5d B5e-4f P*6g G6hx6g +S7fx6g K5hx6g S*5e B4fx5e R5dx5e S*6f R5e-5d B*6e R5d-8d S*7f P8f-8g+ P8bx8a+ R8dx8a S7fx8g</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   3  Interrupt</move>
+      <score>-3552</score>
+      <pv>G7ix7h S8gx7f P*8h P8f-8g+ P8hx8g P*6g G6h-5h S7fx8g G7hx6g S8g-7f+ P*8h +S7fx6g G5hx6g G*6e B5ex9a+ P*6f G6g-7g P*7f G7g-7h S*6g G7h-8g G5b-5a K6i-5i P*5f P5gx5f G6ex5f</pv>
+    </analysisInfo>
+  </analysisInfoList>
+</gameAnalysis>

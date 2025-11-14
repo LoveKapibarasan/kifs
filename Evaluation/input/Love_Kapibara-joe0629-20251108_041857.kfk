@@ -1,0 +1,194 @@
+<gameAnalysis>
+  <kifu>$START_TIME:2025/11/08 04:18:57
+$EVENT:将棋ウォーズ(3分切れ負け スプリント)
+N+Love_Kapibara 四段
+N-joe0629 二段
+P1-KY-KE * -KI *  *  * +RY * 
+P2 * -OU-GI-GI *  *  *  *  * 
+P3 * -FU-KE-GI *  *  *  *  * 
+P4 *  * -FU-FU *  * -FU *  * 
+P5-FU *  * +GI+KA-FU *  *  * 
+P6 *  * +FU * +FU * +FU * +FU
+P7+FU+FU * +KI * -UM *  * -FU
+P8 *  * +OU *  *  *  *  *  * 
+P9+KY+KE * +KI *  *  *  *  * 
+P+00HI00KI00KY00FU00FU00FU
+P-00KE00KY00FU00FU
++
++6564GI,T29
+-6364GI,T3
++5564KA,T4
+-0063KY,T2
+'△手筋：田楽刺し
++6473UM,T2
+-8173KE,T2
++0066FU,T3
+-0065FU,T10
++0086KE,T3
+'▲手筋：控えの桂
+-0085GI,T4
+'△手筋：桂頭の銀
++0022HI,T9
+-0051FU,T10
+'△手筋：銀裾の歩, 歩切れ
++7675FU,T20
+'▲手筋：突き捨て, 桂頭攻め
+-6566FU,T5
++6777KI,T3
+-4756UM,T13
++7888OU,T2
+-6667TO,T1
++2262RY,T8
+'▲手筋：一間竜, 飛車切り
+-6162KI,T2
++2151RY,T1
+-6777TO,T3
+'△手筋：と金攻め
++8977KE,T2
+-0089KI,T15
+'△手筋：尻金
+%TORYO,T0
+</kifu>
+  <scoreList>
+  </scoreList>
+  <engineName>YaneuraOu NNUE V9.00Git 64ZEN1 TOURNAMENT</engineName>
+  <timePerMove>5</timePerMove>
+  <analysisScoreList>-517,2275,-2617,2891,-2997,2972,-1956,2311,-1824,2733,-3192,5476,-3264,6094,-6256,100000,-6027,6284,-6532,100000,-6114,100000,-100000,100000,-100000</analysisScoreList>
+  <analysisInfoList>
+    <analysisInfo>
+      <move>Starting Position</move>
+      <score>
+      </score>
+      <pv>
+      </pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   1  S6ex6d</move>
+      <score>-517</score>
+      <bound>++</bound>
+      <pv>G*5h</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   2  S6cx6d</move>
+      <score>-2275</score>
+      <pv>S6cx6d B5ex6d L*6c B6dx7c+ S6bx7c P*6d L6cx6d P*6f P*6e R*4b P6ex6f +R2ax6a P6fx6g+ K7h-8h B*3c P*4d</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   3  B5ex6d</move>
+      <score>-2617</score>
+      <pv>B5e-4d P*6f G6gx6f N*5d G6f-6g L*6f P*6h L6fx6g+ P6hx6g P*6f G*5h P6fx6g+ G5hx6g S*5c P*6c S6bx6c P*6b P*6f G6g-6h</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   4  L*6c</move>
+      <score>-2891</score>
+      <pv>L*6c P*6f L6cx6d R*3b L6dx6f R3bx6b+ L6fx6g+ +R6bx6g G*5g S*7a K8bx7a +R2ax6a S7bx6a +R6gx6a K7ax6a L*6d P*6c</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   5  B6dx7c+</move>
+      <score>-2997</score>
+      <pv>P*6f L6cx6d G*5h P*6e P6fx6e +B4gx5h G6ix5h P*6f G6gx6f L6dx6e G6fx6e N7cx6e B*5e B*7c L*6d P*6c +R2ax6a</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   6  N8ax7c</move>
+      <score>-2972</score>
+      <pv>S6bx7c P*6d L6cx6d P*6f P*6e G6g-6h P6ex6f K7h-8h P6f-6g+ G*6c +B4gx6i G6hx6i G*7h K8h-9h S7bx6c G6ix7h P*5a</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   7  P*6f</move>
+      <score>-1956</score>
+      <bound>--</bound>
+      <pv>P*6f L6cx6f</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   8  P*6e</move>
+      <score>-2311</score>
+      <pv>L6cx6f G6gx6f S*5g N*9d L9ax9d R*6g +B4gx6i R6gx6i B*5h R6i-5i G*6h K7h-8h S5gx6f R5ix5h G6hx5h S*9a K8bx9a L*9c N*9b L9cx9b+ K9ax9b</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   9  N*8f</move>
+      <score>-1824</score>
+      <bound>--</bound>
+      <pv>N*9d L9ax9d</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  10  S*8e</move>
+      <score>-2733</score>
+      <pv>S*8e G6g-6h P6ex6f P*6d L6cx6d L*9d P6f-6g+ K7h-8h B*6f G*7g +P6gx7g N8ix7g N7c-6e G6i-7h N6ex7g+ G7hx7g +B4gx5f</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  11  R*2b</move>
+      <score>-3192</score>
+      <pv>G6g-7g P6ex6f P*6d +B4gx5f K7h-7i B*4f P*5g +B5fx5g L*6h L6cx6d P*6c P6f-6g+ P6cx6b+ +B5gx6h K7i-8h +B6hx7g N8ix7g +P6gx7g K8hx7g</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  12  P*5a</move>
+      <score>-5476</score>
+      <pv>P6ex6f G6g-6h P6f-6g+ K7h-8h +B4gx6i G6hx6i B*6f G*7g +P6gx7g N8ix7g B6fx2b L*5e L6cx6i+</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  13  P7f-7e</move>
+      <score>-3264</score>
+      <pv>P6fx6e L6cx6e P*6f L6ex6f G6gx6f N*5d G6f-6g S8ex8f G*7i P*6f G6g-6h +B4gx5f P*6g P6fx6g+ G6hx6g +B5fx6g K7hx6g S8fx8g B*4d B*6e K6g-5g S8gx7f P*7g G*5f K5g-4h G5f-4g K4h-5i</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  14  P6ex6f</move>
+      <score>-6094</score>
+      <pv>P6ex6f G6gx6f L6cx6f P*6h P*6g S*7a S6bx7a N8fx7d S8ex7d P6hx6g L6fx6g+ K7hx6g G*5g K6g-7g +B4gx6i</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  15  G6g-7g</move>
+      <score>-6256</score>
+      <pv>K7h-8h P6fx6g+ K8h-9h +B4gx6i G*8h N*7f R2b-2h+ B*7i</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  16  +B4gx5f</move>
+      <score>-Mate:15</score>
+      <pv>P6f-6g+ G7gx6g L6cx6g+ K7hx6g G*7f K6g-7h N*6f K7h-8h G7fx8g K8hx8g +B4gx6i S*7h +B6ix7h K8g-9h B*8g</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  17  K7h-8h</move>
+      <score>-6027</score>
+      <pv>K7h-8h P6f-6g+ G7gx6g L6cx6g+ K8h-9h B*6f S*7i P9e-9f</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  18  P6f-6g+</move>
+      <score>-6284</score>
+      <pv>P6f-6g+ G7gx6g L6cx6g+ K8h-9h N*7f G*7i S8ex8f L*8h B*6e S*9c K8bx9c P7ex7d N7fx8h+ G7ix8h</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  19  R2bx6b+</move>
+      <score>-6532</score>
+      <pv>N8fx7d S8ex7d G7g-8f B*5e L*7g B5ex2b G*7i +P6gx7g N8ix7g B2bx7g+ K8h-9h P9e-9f G8fx9f N*8f G9fx8f L9ax9g+ K9hx9g N*8e K9g-9f L*9e K9fx9e</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  20  G6ax6b</move>
+      <score>-Mate:7</score>
+      <pv>+P6gx7g K8hx7g B*6f K7g-6h N*7f K6h-5i G*4h</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  21  +R2ax5a</move>
+      <score>-6114</score>
+      <pv>S*7a K8bx7a +R2ax5a P*6a +R5ax5f +P6gx7g N8ix7g L6cx6i+ B*5g R*5h G*7h R5hx5g+ L*8i P9e-9f P9gx9f +R5gx5f S*8b K7ax8b P*6h</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  22  +P6gx7g</move>
+      <score>-Mate:7</score>
+      <pv>+P6gx7g K8hx7g L6c-6g+ K7g-8h N*7f K8h-9h R*8h</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  23  N8ix7g</move>
+      <score>-Mate:6</score>
+      <pv>K8hx7g L6c-6g+ K7g-8h N*7f K8h-9h R*8h</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  24  G*8i</move>
+      <score>-Mate:3</score>
+      <pv>R*8i K8h-9h G*8h</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  25  Resigns</move>
+      <score>-Mate:2</score>
+      <pv>K8h-9h R*8h</pv>
+    </analysisInfo>
+  </analysisInfoList>
+</gameAnalysis>

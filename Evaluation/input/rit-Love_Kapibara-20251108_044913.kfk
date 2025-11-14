@@ -1,0 +1,124 @@
+<gameAnalysis>
+  <kifu>$START_TIME:2025/11/08 04:49:13
+$EVENT:将棋ウォーズ(3分切れ負け スプリント)
+N+rit 四段
+N-Love_Kapibara 四段
+P1-KY *  * -KI *  *  *  * -KY
+P2 * -OU-KI *  *  *  *  *  * 
+P3 * -GI-KE-FU-FU-FU-HI-FU * 
+P4-FU-FU-FU *  * +HI+GI * -FU
+P5 *  *  *  * +FU *  * +FU * 
+P6+FU *  * +FU+KI *  *  * +FU
+P7 * +FU+GI *  *  *  *  *  * 
+P8 * +OU+KI * -KA * -FU *  * 
+P9+KY+KE *  *  *  *  *  * +KY
+P+00KA00GI00KE00FU
+P-00KE00FU00FU
++
++3433NG,T63
+-4344FU,T2
++0031HI,T10
+-6171KI,T4
++5657KI,T51
+-5869UM,T8
++5554FU,T27
+'▲手筋：突き捨て
+-5354FU,T2
++0053KA,T3
+-0062KE,T8
++3343NG,T6
+-0048HI,T4
+%TIME_UP,T0
+</kifu>
+  <scoreList>
+  </scoreList>
+  <engineName>YaneuraOu NNUE V9.00Git 64ZEN1 TOURNAMENT</engineName>
+  <timePerMove>5</timePerMove>
+  <analysisScoreList>-175,308,-391,450,-554,594,-376,1391,-207,858,1500,-1125,835</analysisScoreList>
+  <analysisInfoList>
+    <analysisInfo>
+      <move>Starting Position</move>
+      <score>
+      </score>
+      <pv>
+      </pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   1  S3dx3c+</move>
+      <score>-175</score>
+      <bound>--</bound>
+      <pv>G5f-5g P4cx4d</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   2  P4cx4d</move>
+      <score>-308</score>
+      <bound>--</bound>
+      <pv>P4cx4d</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   3  R*3a</move>
+      <score>-391</score>
+      <bound>--</bound>
+      <pv>R*4a G6a-7a</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   4  G6a-7a</move>
+      <score>-450</score>
+      <bound>--</bound>
+      <pv>G6a-7a</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   5  G5f-5g</move>
+      <score>-554</score>
+      <bound>--</bound>
+      <pv>G5f-5g N*7f</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   6  B5h-6i+</move>
+      <score>-594</score>
+      <bound>--</bound>
+      <pv>N*7f</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   7  P5e-5d</move>
+      <score>-376</score>
+      <bound>++</bound>
+      <pv>S*5h</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   8  P5cx5d</move>
+      <score>-1391</score>
+      <bound>--</bound>
+      <pv>R*5i</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   9  B*5c</move>
+      <score>-207</score>
+      <bound>++</bound>
+      <pv>S*5h</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  10  N*6b</move>
+      <score>-858</score>
+      <bound>--</bound>
+      <pv>R*5i</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  11  +S3c-4c</move>
+      <score>1500</score>
+      <pv>S*5h +B6ix7h K8hx7h P3h-3i+ S7g-6h +P3i-3h S5h-6i R*4i +S3c-4c +P3h-4h +S4c-5b G*8a P*3i P*3d R3ax3d+ P5d-5e B*6g P5e-5f G5gx5f P*5h</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  12  R*4h</move>
+      <score>1125</score>
+      <bound>--</bound>
+      <pv>R*4h</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  13  Timeup</move>
+      <score>835</score>
+      <bound>--</bound>
+      <pv>S*7i P9d-9e</pv>
+    </analysisInfo>
+  </analysisInfoList>
+</gameAnalysis>
