@@ -80,4 +80,3 @@ for kif in "$HOME"/Downloads/*.kif; do
 done
 
 "$SCRIPT_DIR/compare_kif" "$HOME/kifs/Evaluation/evaluated_kif" "$TARGET"
-"$SCRIPT_DIR/compare_kif" "$HOME/kifs/Evaluation/evaluated_kif_24" "$TARGET"
