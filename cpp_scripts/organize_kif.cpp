@@ -17,11 +17,11 @@ const fs::path HOME_DIR = std::getenv("HOME") != nullptr
 
 const fs::path BASE_DIR = getExecutableDir();
 
-const fs::path INPUT_FOLDER = BASE_DIR / ".." / "kifs" / "Evaluation" / "input";
+const fs::path INPUT_FOLDER = BASE_DIR / ".." /  "Evaluation" / "input";
 #ifdef _WIN32
-const fs::path SETTING_FILE = BASE_DIR / ".." / "kifs" / "setting_windows.json";
+const fs::path SETTING_FILE = BASE_DIR /  "setting_windows.json";
 #else
-const fs::path SETTING_FILE = BASE_DIR / ".." / "kifs" / "setting.json";
+const fs::path SETTING_FILE = BASE_DIR /  "setting.json";
 #endif
 
 

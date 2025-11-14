@@ -8,7 +8,7 @@
   {
     "name": "wars",
     "player": "Love_Kapibara",
-    "pattern": "^.*?(\\d{8})_.*?\\.*$",
+    "pattern": "^.*?(\\d{8})_.*?\\.kif$",
     "output_path": "../Evaluation/evaluated_kif"
   },
     {

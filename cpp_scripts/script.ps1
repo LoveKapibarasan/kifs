@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 $TMPDIR = "$HOME/tmp/kif_extract"
 $UNPARSED = "$HOME/tmp/unparsed_kif"
 $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
-$TARGET = "$SCRIPT_DIR/../kifs/Evaluation/input"
+$TARGET = "$SCRIPT_DIR/../Evaluation/input"
 
 New-Item -ItemType Directory -Force -Path $TARGET | Out-Null
 New-Item -ItemType Directory -Force -Path $UNPARSED | Out-Null
@@ -80,14 +80,15 @@ $files = Get-ChildItem $TARGET -Recurse -File -Filter *.kif
 foreach ($f in $files) {
     $tmp = "$($f.FullName).tmp"
 
-    iconv -f SHIFT_JIS -t UTF-8 "$($f.FullName)" > "$tmp"
-    mv "$tmp" "$($f.FullName)"
+    # SHIFT_JIS を読み込み → UTF-8 で書き出す
+    $bytes = [System.IO.File]::ReadAllBytes($f.FullName)
+    $text  = [Text.Encoding]::GetEncoding("shift_jis").GetString($bytes)
+    [System.IO.File]::WriteAllText($tmp, $text, [Text.Encoding]::UTF8)
+
+    Move-Item -Force -LiteralPath $tmp -Destination $f.FullName
 
     Write-Host "Converted: $($f.FullName)"
 }
-
-
-
 
 # Compare
 ## normalize
