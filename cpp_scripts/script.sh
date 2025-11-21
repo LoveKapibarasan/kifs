@@ -3,10 +3,11 @@ set -e
 # Enable nullglob so literal *.zip is not processed
 shopt -s nullglob
 
-TARGET="$HOME/kifs/Evaluation/input"
 TMPDIR="$HOME/tmp/kif_extract"
 UNPARSED="$HOME/tmp/unparsed_kif"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TARGET="$SCRIPT_DIR/../kifs/Evaluation/input"
+
 mkdir -p "$TARGET"
 mkdir -p "$UNPARSED"
 
@@ -79,4 +80,3 @@ for kif in "$HOME"/Downloads/*.kif; do
 done
 
 "$SCRIPT_DIR/compare_kif" "$HOME/kifs/Evaluation/evaluated_kif" "$TARGET"
-"$SCRIPT_DIR/compare_kif" "$HOME/kifs/Evaluation/evaluated_kif_24" "$TARGET"

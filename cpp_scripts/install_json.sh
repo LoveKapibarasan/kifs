@@ -16,5 +16,3 @@ echo "Downloading nlohmann/json single header..."
 wget -O json.hpp https://raw.githubusercontent.com/nlohmann/json/develop/single_include/nlohmann/json.hpp
 
 echo "json.hpp installed locally in current directory."
-echo "Now you can compile with:"
-echo "  g++ -std=c++17 -O2 -o organize_kif organize_kif.cpp"

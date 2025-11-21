@@ -1,0 +1,111 @@
+<gameAnalysis>
+  <kifu>$START_TIME:2025/11/05 01:23:48
+$EVENT:将棋ウォーズ(3分切れ負け スプリント)
+N+16adhoc7 四段
+N-Love_Kapibara 四段
+P1-KY-KE *  *  *  * +UM-KE-KY
+P2 * -OU-GI-KI *  *  * +FU * 
+P3 * -FU-FU-FU *  * -FU *  * 
+P4-FU *  *  * -FU *  * -HI-FU
+P5 *  *  * +FU *  *  * -FU * 
+P6+FU * +FU * +FU+FU *  * +FU
+P7 * +FU+KE *  *  *  *  *  * 
+P8 * +OU+GI+KI+KI *  *  *  * 
+P9+KY *  *  *  *  * -UM+KE+KY
+P+00KI00GI
+P-00HI00GI00FU00FU
++
++2937KE,T8
+-2434HI,T26
++3745KE,T2
+'▲手筋：高跳びの桂
+-3966UM,T4
++0067GI,T6
+-3439RY,T12
++6869KI,T12
+'▲手筋：堅陣の金
+-6677UM,T8
++8877OU,T2
+-0085GI,T3
++0017KA,T8
+'▲手筋：遠見の角, 自陣角
+%TORYO,T0
+</kifu>
+  <scoreList>
+  </scoreList>
+  <engineName>YaneuraOu NNUE V9.00Git 64ZEN1 TOURNAMENT</engineName>
+  <timePerMove>5</timePerMove>
+  <analysisScoreList>-156,706,-664,486,-693,1691,-1501,2688,-590,722,2296,-2113</analysisScoreList>
+  <analysisInfoList>
+    <analysisInfo>
+      <move>Starting Position</move>
+      <score>
+      </score>
+      <pv>
+      </pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   1  N2i-3g</move>
+      <score>-156</score>
+      <bound>++</bound>
+      <pv>P6e-6d</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   2  R2d-3d</move>
+      <score>-706</score>
+      <pv>R*2i P2bx2a+ R2ix1i+ N3g-4e +B3i-1g G*6i L*6f +P2ax1a L6fx6h+ G5hx6h R2d-3d L*8f R3d-3h+ L*8e S*7d N*7e G*9c P5f-5e P5dx5e S*5d S7dx7e</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   3  N3g-4e</move>
+      <score>-664</score>
+      <pv>N3g-4e R3d-3h+ P6e-6d R*2i G*6i P6cx6d N4e-5c+ G6b-6a +B3ax2a +B3i-6f +B2ax5d P*5g G5h-5i S*5h S*4h S5hx5i</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   4  +B3i-6f</move>
+      <score>-486</score>
+      <bound>++</bound>
+      <pv>R*2i P6e-6d</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   5  S*6g</move>
+      <score>-693</score>
+      <pv>P2bx2a+ R3d-3i+ N*6i G6b-6a +B3a-5c S*6b +B5c-4c +R3ix1i S*6g +B6f-8d +P2ax1a P9d-9e P9fx9e P*9f L9ix9f P*9g L*8f</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   6  R3d-3i+</move>
+      <score>-1691</score>
+      <pv>R3d-3i+ G*6i +B6f-8d P2bx2a+ P*4g +P2ax1a P4g-4h+ L*8f +P4hx5h G6hx5h +B8d-9c N4e-5c+ G6b-6a P6e-6d P6cx6d P*6b G6a-5a +B3a-2a G*4b</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   7  G6h-6i</move>
+      <score>-1501</score>
+      <bound>++</bound>
+      <pv>G*6i</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   8  +B6fx7g</move>
+      <score>-2688</score>
+      <pv>+B6f-4d P2bx2a+ R*4i G5h-6h R4ix4f+ N4ex3c+ +B4dx3c +B3a-7e +R3ix1i +P2ax1a S*8d +B7e-5g +R4fx5g G6hx5g N*8e N*8i P9d-9e L*8f N8ex7g</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   9  K8hx7g</move>
+      <score>-590</score>
+      <pv>K8hx7g N*8e K7g-6f R*4i N4e-5c+ G6b-6a +N5cx5d S*7g S7hx7g N8ex7g+ G*5i +N7gx6g G5hx6g R4ix5i+ G6ix5i +R3ix5i P2bx2a+ P*4b N*8f S*8e K6f-5e +R5i-6i R*6h +R6ix6h G6gx6h S8ex8f +B3ax4b</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  10  S*8e</move>
+      <score>-722</score>
+      <pv>N*8e K7g-6f R*4i N4e-5c+ G6b-6a +N5cx5d S*7g S7hx7g N8ex7g+ G*5i +N7gx6g K6fx6g +R3i-3g S*5g R4ix1i+ P2bx2a+ S*7d N*4i +R3g-2g B*4c L*4g G5i-6h</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  11  B*1g</move>
+      <score>2296</score>
+      <pv>+B3a-7e +R3ix1i N4e-5c+ G6b-6a +B7ex8e L*8d +B8e-7e +R1ix6i S7hx6i N*8e K7g-6h G*7g K6h-5g G7gx6g G5hx6g R*1g S*4g S*3f S6i-5h S3fx4g</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>  12  Resigns</move>
+      <score>2113</score>
+      <pv>+R3ix6i S7hx6i G6b-6a R*3b R*8i K7g-6h G*7g K6hx7g R8ix6i+ G*7h +R6ix1i +B3a-5c S*8i G*7a S8ix7h+ K7gx7h L*6b G7ax6a S7bx6a +B5cx6b S6ax6b R3bx6b+ G*7b</pv>
+    </analysisInfo>
+  </analysisInfoList>
+</gameAnalysis>

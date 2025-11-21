@@ -1,0 +1,90 @@
+<gameAnalysis>
+  <kifu>$START_TIME:2025/10/17 03:11:16
+$EVENT:将棋ウォーズ(3分切れ負け スプリント)
+N+rikorudy 三段
+N-Love_Kapibara 四段
+P1-KY-KE *  *  *  *  *  * -KY
+P2 * -GI-KI * -OU-GI-KI *  * 
+P3 *  *  *  * -FU-FU-KE *  * 
+P4 *  * +GI-FU *  *  *  *  * 
+P5-FU * +FU *  *  * -UM * -FU
+P6 *  *  * +FU+KI *  * +FU * 
+P7+FU+FU *  *  * +FU+FU * +FU
+P8 *  *  *  * +HI * +GI+OU * 
+P9+KY *  *  * +HI+KI * +KE+KY
+P+00FU00FU00FU00FU00FU
+P-00KA00KE
++
++5646KI,T8
+-3526UM,T7
++0027FU,T3
+-2644UM,T5
++4655KI,T7
+-4435UM,T25
++6665FU,T9
+'▲手筋：突き捨て
+%CHUDAN,T0
+</kifu>
+  <scoreList>
+  </scoreList>
+  <engineName>YaneuraOu NNUE V9.00Git 64ZEN1 TOURNAMENT</engineName>
+  <timePerMove>5</timePerMove>
+  <analysisScoreList>12,138,-175,374,-315,392,-260,964</analysisScoreList>
+  <analysisInfoList>
+    <analysisInfo>
+      <move>Starting Position</move>
+      <score>
+      </score>
+      <pv>
+      </pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   1  G5f-4f</move>
+      <score>12</score>
+      <bound>--</bound>
+      <pv>P6f-6e P1e-1f</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   2  +B3ex2f</move>
+      <score>-138</score>
+      <bound>--</bound>
+      <pv>+B3ex2f</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   3  P*2g</move>
+      <score>-175</score>
+      <bound>--</bound>
+      <pv>P*5d B*6g</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   4  +B2f-4d</move>
+      <score>-374</score>
+      <bound>--</bound>
+      <pv>+B2f-2e</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   5  G4f-5e</move>
+      <score>-315</score>
+      <bound>--</bound>
+      <pv>P*5d P5cx5d</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   6  +B4d-3e</move>
+      <score>-392</score>
+      <bound>++</bound>
+      <pv>+B4d-3e P*5d</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   7  P6f-6e</move>
+      <score>-260</score>
+      <bound>++</bound>
+      <pv>P*5d</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   8  Interrupt</move>
+      <score>-964</score>
+      <bound>--</bound>
+      <pv>K5b-4a</pv>
+    </analysisInfo>
+  </analysisInfoList>
+</gameAnalysis>

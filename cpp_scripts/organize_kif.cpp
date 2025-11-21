@@ -4,19 +4,33 @@
 #include <regex>
 #include <optional>
 #include "json.hpp"
+#include "util.h"
+
+
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
-const std::string HOME_DIR = std::getenv("HOME");
-const std::string INPUT_FOLDER = fs::path(HOME_DIR) / "kifs" / "Evaluation" / "input";
-const std::string SETTING_FILE = fs::path(HOME_DIR) / "kifs" / "setting.json";
+const fs::path HOME_DIR = std::getenv("HOME") != nullptr
+    ? std::getenv("HOME")
+    : std::getenv("USERPROFILE");  // Windows 
+
+const fs::path BASE_DIR = getExecutableDir();
+
+const fs::path INPUT_FOLDER = BASE_DIR / ".." /  "Evaluation" / "input";
+#ifdef _WIN32
+const fs::path SETTING_FILE = BASE_DIR /  "setting_windows.json";
+#else
+const fs::path SETTING_FILE = BASE_DIR /  "setting.json";
+#endif
+
+
 
 // Load settings from JSON file
 json loadSettings() {
     std::ifstream file(SETTING_FILE);
     if (!file.is_open()) {
-        throw std::runtime_error("Could not open " + SETTING_FILE);
+       throw std::runtime_error(std::string("Could not open ") + SETTING_FILE.string());
     }
     json settings;
     file >> settings;

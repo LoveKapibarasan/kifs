@@ -30,8 +30,8 @@ int main(int argc, char* argv[]) {
                   << " From folder_b, duplicated files will be deleted.\n";
         return 1;
     }
-    fs::path folderA = argv[1];
-    fs::path folderB = argv[2];
+    fs::path folderA = fs::absolute(argv[1]);
+    fs::path folderB = fs::absolute(argv[2]);
     std::cout << "Comparing " << folderA << " with " << folderB << "\n";
     if (!fs::is_directory(folderA) || !fs::is_directory(folderB)) {
         std::cerr << "Both arguments must be folders.\n";

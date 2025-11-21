@@ -1,0 +1,74 @@
+<gameAnalysis>
+  <kifu>$START_TIME:2025/11/05 01:49:59
+$EVENT:将棋ウォーズ(3分切れ負け スプリント)
+N+3nomi 三段
+N-Love_Kapibara 四段
+P1-KY+UM *  *  * -KI * -KE-KY
+P2 *  * +UM-FU *  * -OU *  * 
+P3 *  * -GI * -RY-FU * -FU * 
+P4-FU *  *  *  * -KI-FU *  * 
+P5 *  *  * +FU *  *  *  *  * 
+P6 *  *  *  * -FU *  *  * -FU
+P7+FU *  *  * +GI+FU+FU+FU * 
+P8 *  *  *  * +KI * +GI+OU+FU
+P9 *  * -RY * +KY+KI * +KE+KY
+P+00GI00FU
+P-00KE00KE00FU00FU00FU00FU
++
++5768GI,T3
+-7989RY,T6
++0054FU,T13
+'▲手筋：たたきの歩, 歩裏の歩
+-4454KI,T15
++7254UM,T2
+%TORYO,T0
+</kifu>
+  <scoreList>
+  </scoreList>
+  <engineName>YaneuraOu NNUE V9.00Git 64ZEN1 TOURNAMENT</engineName>
+  <timePerMove>5</timePerMove>
+  <analysisScoreList>-117,124,240,528,1594,-1791</analysisScoreList>
+  <analysisInfoList>
+    <analysisInfo>
+      <move>Starting Position</move>
+      <score>
+      </score>
+      <pv>
+      </pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   1  S5g-6h</move>
+      <score>-117</score>
+      <bound>--</bound>
+      <pv>S5g-6h +R7i-7h</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   2  +R7i-8i</move>
+      <score>-124</score>
+      <bound>++</bound>
+      <pv>+R7i-7h +B8ax9a</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   3  P*5d</move>
+      <score>240</score>
+      <bound>--</bound>
+      <pv>+B8ax9a N*7f</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   4  G4dx5d</move>
+      <score>-528</score>
+      <bound>--</bound>
+      <pv>+R5c-5a</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   5  +B7bx5d</move>
+      <score>1594</score>
+      <pv>+B7bx5d +R5c-5a +B8a-7b P*7a G*6a P7ax7b G6ax5a G4ax5a R*7a G*5b R7ax9a+ N*6f G5h-6g P5f-5g+ G6gx5g P*5h G5gx6f P5hx5i+ S6hx5i N*5g N*4d K3b-2b +R9ax5a G5bx5a G*3b K2b-1c +B5d-3f P4cx4d S*1d K1c-1b</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   6  Resigns</move>
+      <score>1791</score>
+      <pv>+R5c-5a +B8a-7b P*7a G*6a P7ax7b G6ax5a G4ax5a R*7a G*4a R7ax9a+ P*8a L*4f G5a-4b +B5d-5e N*5g +B5ex1a N5gx4i+ S3hx4i B*3c +B1ax3c G4bx3c N*4e N*3e +R9ax9d B*6f N4ex3c+ N2ax3c L4fx4c+ K3bx4c B*5d K4c-5b P*5c K5b-6a B5d-4c+ L*5b +R9dx3d K6a-7a +R3dx3e</pv>
+    </analysisInfo>
+  </analysisInfoList>
+</gameAnalysis>

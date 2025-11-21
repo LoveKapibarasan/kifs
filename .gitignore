@@ -1,6 +1,7 @@
-compare_kif
-organize_kif
-json.hpp
+cpp_scripts/compare_kif
+cpp_scripts/organize_kif
+**.exe
+cpp_scripts/json.hpp
 node_modules/
 .env
 venv/
