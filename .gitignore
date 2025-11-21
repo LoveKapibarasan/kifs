@@ -1,5 +1,5 @@
-cpp_scripts/compare_kif
-cpp_scripts/organize_kif
+organize_kif
+compare_kif
 **.exe
 cpp_scripts/json.hpp
 node_modules/
@@ -10,6 +10,9 @@ __pycache__
 __pycache__/
 **.pkl
 util.sh
+json.hpp
+
+
 ### AL ###
 #Template for AL projects for Dynamics 365 Business Central
 #launch.json folder
