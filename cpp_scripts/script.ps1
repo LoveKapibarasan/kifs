@@ -62,7 +62,7 @@ Get-ChildItem "$HOME/Downloads" -Filter *.zip | ForEach-Object {
     if ( (tar -tf $_.FullName | Select-String -Quiet "\.kif") ) {
         Write-Host "Processing $($_.FullName)"
         tar -xf $_.FullName -C $TMPDIR
-        Get-ChildItem $TMPDIR -Recurse -Filter *.kif | Move-Item -Destination $TARGET
+        Get-ChildItem $TMPDIR -Recurse -Filter *.kif | Move-Item -Destination $TARGET -Force
         Remove-Item -Recurse -Force $TMPDIR
         Remove-Item $_.FullName
     } else {
