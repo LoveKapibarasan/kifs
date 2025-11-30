@@ -56,7 +56,7 @@ Get-ChildItem -Path $UNPARSED -File | Move-Item -Destination $TARGET -Force
 # Process ZIP files containing .kif
 Get-ChildItem "$HOME/Downloads" -Filter *.zip | ForEach-Object {
     Write-Host "Checking $($_.FullName)"
-    Remove-Item -Recurse -Force $TMPDIR
+    Remove-Item -Recurse -Force $TMPDIR -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force -Path $TMPDIR | Out-Null
 
     if ( (tar -tf $_.FullName | Select-String -Quiet "\.kif") ) {
@@ -75,20 +75,13 @@ Get-ChildItem "$HOME/Downloads" -Filter *.zip | ForEach-Object {
 Get-ChildItem "$HOME/Downloads" -Filter *.kif | Move-Item -Destination $TARGET
 
 
-$files = Get-ChildItem $TARGET -Recurse -File -Filter *.kif
-
-foreach ($f in $files) {
-    $tmp = "$($f.FullName).tmp"
-
-    # SHIFT_JIS を読み込み → UTF-8 で書き出す
-    $bytes = [System.IO.File]::ReadAllBytes($f.FullName)
-    $text  = [Text.Encoding]::GetEncoding("shift_jis").GetString($bytes)
-    [System.IO.File]::WriteAllText($tmp, $text, [Text.Encoding]::UTF8)
-
-    Move-Item -Force -LiteralPath $tmp -Destination $f.FullName
-
-    Write-Host "Converted: $($f.FullName)"
+if (-not (Test-Path "$SCRIPT_DIR/convert_kif.exe")) {
+    Write-Host "Compiling convert_kif..."
+    g++ -std=c++17 -O2 -o "$SCRIPT_DIR/convert_kif.exe" "$SCRIPT_DIR/convert_kif.cpp"
 }
+
+& "$SCRIPT_DIR/convert_kif.exe" $TARGET
+
 
 # Compare
 ## normalize

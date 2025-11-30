@@ -1,5 +1,6 @@
 organize_kif
 compare_kif
+convert_kif
 **.exe
 cpp_scripts/json.hpp
 node_modules/
