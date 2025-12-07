@@ -3,11 +3,12 @@
 #include <filesystem>
 #include <regex>
 #include <optional>
+#include <spdlog/spdlog.h>
 #include "json.hpp"
 #include "util.h"
 
 
-
+using namespace std;
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
@@ -24,6 +25,8 @@ const fs::path SETTING_FILE = BASE_DIR /  "setting_windows.json";
 const fs::path SETTING_FILE = BASE_DIR /  "setting.json";
 #endif
 
+spdlog::info("Debug: INPUT_FOLDER = {}", INPUT_FOLDER);
+spdlog::info("Debug: SETTING_FILE = {}", SETTING_FILE);
 
 
 // Load settings from JSON file
@@ -60,7 +63,7 @@ void organizeKif() {
 
         auto matched_setting = findSetting(filename, settings);
         if (!matched_setting) {
-            std::cerr << "Error: setting for player not found in setting.json\n";
+            cerr << "Error: setting for player not found in setting.json\n";
             continue;
         }
 
@@ -79,8 +82,8 @@ void organizeKif() {
             fs::path output_file_path = target_folder / filename;
             fs::rename(full_path, output_file_path);
         } else {
-            std::cout << "Pattern did not match filename: " << filename << "\n";
-            std::cout << "Using pattern: " << pattern << "\n";
+            cout << "Pattern did not match filename: " << filename << "\n";
+            cout << "Using pattern: " << pattern << "\n";
         }
     }
 }
@@ -89,7 +92,7 @@ int main() {
     try {
         organizeKif();
     } catch (const std::exception& e) {
-        std::cerr << "Fatal error: " << e.what() << "\n";
+        cerr << "Fatal error: " << e.what() << "\n";
         return 1;
     }
     return 0;
