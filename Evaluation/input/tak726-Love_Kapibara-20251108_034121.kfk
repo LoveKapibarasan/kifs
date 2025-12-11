@@ -1,0 +1,87 @@
+<gameAnalysis>
+  <kifu>$START_TIME:2025/11/08 03:41:21
+$EVENT:将棋ウォーズ(3分切れ負け スプリント)
+N+tak726 三段
+N-Love_Kapibara 四段
+P1-KY *  * -KI *  *  *  * -KY
+P2 *  *  * -GI-OU *  * +UM * 
+P3 *  * -KE-FU * -FU * -FU-FU
+P4-FU *  *  * -FU-GI+FU *  * 
+P5 *  *  * +FU * +KE *  *  * 
+P6+FU * -FU * +FU+KI * +FU * 
+P7 * -RY *  *  *  *  *  * +FU
+P8 *  *  * +GI+OU * +HI *  * 
+P9+KY+KE *  *  *  *  * +KE+KY
+P+00KI
+P-00KA00KI00GI00FU00FU00FU00FU00FU
++
++2244UM,T40
+'▲手筋：馬切り
+-4344FU,T10
+'△手筋：桂頭攻め
++0043GI,T3
+'▲手筋：肩銀
+-5243OU,T9
+'△手筋：裸玉
++3433TO,T2
+-4352OU,T1
++0042KI,T2
+'▲手筋：腹金
+%TSUMI,T0
+</kifu>
+  <scoreList>
+  </scoreList>
+  <engineName>YaneuraOu NNUE V9.00Git 64ZEN1 TOURNAMENT</engineName>
+  <timePerMove>5</timePerMove>
+  <analysisScoreList>-442,1981,100000,-100000,100000,-100000,100000,-100000</analysisScoreList>
+  <analysisInfoList>
+    <analysisInfo>
+      <move>Starting Position</move>
+      <score>
+      </score>
+      <pv>
+      </pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   1  +B2bx4d</move>
+      <score>-442</score>
+      <bound>--</bound>
+      <pv>P3d-3c+ B*1d</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   2  P4cx4d</move>
+      <score>-1981</score>
+      <pv>B*1d K5h-4i G6a-5a S*5c K5b-6a +B4dx4c K6a-7b P*8d +R8gx8d S5cx6b G5ax6b N4e-5c+ G6bx5c S*6a K7b-8b</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   3  S*4c</move>
+      <score>+Mate:5</score>
+      <pv>S*4c K5bx4c P3d-3c+ K4c-5b G*4b</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   4  K5bx4c</move>
+      <score>+Mate:4</score>
+      <pv>K5bx4c P3d-3c+ K4c-5b G*4b</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   5  P3d-3c+</move>
+      <score>+Mate:3</score>
+      <pv>P3d-3c+ K4c-5b G*4b</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   6  K4c-5b</move>
+      <score>+Mate:2</score>
+      <pv>K4c-5b G*4b</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   7  G*4b</move>
+      <score>+Mate:1</score>
+      <pv>G*4b</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   8  Mate</move>
+      <score>+Mate:1</score>
+      <pv>resign</pv>
+    </analysisInfo>
+  </analysisInfoList>
+</gameAnalysis>

@@ -1,0 +1,47 @@
+<gameAnalysis>
+  <kifu>$START_TIME:2025/10/19 16:54:18
+$EVENT:将棋ウォーズ(3分切れ負け スプリント)
+N+takebayashi1111 五段
+N-Love_Kapibara 四段
+P1 *  *  * -GI *  * -HI * -KY
+P2-KI-OU *  * +FU *  *  *  * 
+P3-KE-FU-FU+KI *  *  * -FU-FU
+P4 * -GI *  *  *  * -FU *  * 
+P5 *  * +KE * -KA *  *  *  * 
+P6+KY * +FU *  * -GI *  *  * 
+P7+HI+FU * +FU *  * +FU+FU+FU
+P8 *  *  *  *  *  * +GI+OU * 
+P9+KY *  * -UM * +KI * +KE+KY
+P+00FU00FU00FU00FU00FU
+P-00KI00KE00FU
++
++0094FU,T33
+'▲手筋：桂頭攻め
+%CHUDAN,T0
+</kifu>
+  <scoreList>
+  </scoreList>
+  <engineName>YaneuraOu NNUE V9.00Git 64ZEN1 TOURNAMENT</engineName>
+  <timePerMove>5</timePerMove>
+  <analysisScoreList>-418,100000</analysisScoreList>
+  <analysisInfoList>
+    <analysisInfo>
+      <move>Starting Position</move>
+      <score>
+      </score>
+      <pv>
+      </pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   1  P*9d</move>
+      <score>-418</score>
+      <bound>++</bound>
+      <pv>G4i-3i</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   2  Interrupt</move>
+      <score>-Mate:7</score>
+      <pv>S4fx3g+ S3hx3g N*3f K2h-1h G*2h S3gx2h B5ex2h+</pv>
+    </analysisInfo>
+  </analysisInfoList>
+</gameAnalysis>

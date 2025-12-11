@@ -1,0 +1,77 @@
+<gameAnalysis>
+  <kifu>$START_TIME:2025/11/05 01:37:19
+$EVENT:将棋ウォーズ(3分切れ負け スプリント)
+N+sugarphantom 四段
+N-Love_Kapibara 四段
+P1-KY *  *  *  *  *  * -KE-KY
+P2 *  * +TO *  * -KI-KI-OU * 
+P3 *  *  *  *  * -FU-GI-FU-FU
+P4 *  *  *  *  *  * -FU *  * 
+P5-FU *  * -FU *  *  *  *  * 
+P6 *  *  *  *  *  *  *  *  * 
+P7+FU *  * +FU * +FU+FU+FU+FU
+P8 *  *  *  * -TO+GI * +OU * 
+P9+KY+RY *  *  * -UM+KI+KE+KY
+P+00HI00KA00KE00KE00FU00FU
+P-00KI00GI00GI00FU00FU
++
++3949KI,T0
+-0088FU,T1
+'△手筋：たたきの歩
++4958KI,T10
+-8889TO,T1
++0081HI,T7
+-0049GI,T3
+%TORYO,T0
+</kifu>
+  <scoreList>
+  </scoreList>
+  <engineName>YaneuraOu NNUE V9.00Git 64ZEN1 TOURNAMENT</engineName>
+  <timePerMove>5</timePerMove>
+  <analysisScoreList>77,-134,412,2260,-2211,4283,-4341</analysisScoreList>
+  <analysisInfoList>
+    <analysisInfo>
+      <move>Starting Position</move>
+      <score>
+      </score>
+      <pv>
+      </pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   1  G3ix4i</move>
+      <score>77</score>
+      <pv>G3ix4i P*5g R*5a +P5hx4i +R8ix4i G*5h +R4ix5h P5gx5h+ R5ax5h+ P*5g S4hx5g R*7i P*5i R7ix9i+ G*4i L*5c</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   2  P*8h</move>
+      <score>134</score>
+      <bound>++</bound>
+      <pv>P*5g N*5d</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   3  G4ix5h</move>
+      <score>412</score>
+      <pv>+R8i-7i P*7h +R7i-6i +P5hx6i N*5d S*5h G4i-3i G*4i B*7e G4ix3i S4hx3i S5hx4g+ P*4h R*5i P4hx4g R5ix5d+ B*3f</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   4  P8hx8i+</move>
+      <score>-2260</score>
+      <pv>P8hx8i+ B*4i P*5g S4hx5g R*7h P*5i +P8ix9i N*5d L*5c N*4f G4b-4a R*6a G4a-3a B*6d K2b-1b R6ax9a+ L5cx5d N4fx5d</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   5  R*8a</move>
+      <score>-2211</score>
+      <pv>B*3h R*7h P*5i +P8ix9i N*5d L*5a N*4f G4b-4a R*6a S*6i +P7b-6b L5ax5d R6ax4a+ G*3a +R4ax3a G3bx3a N4fx5d S6ix5h P5ix5h N*5f B*5c G*4a G*3i N5fx4h+ G3ix4h S*5i</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   6  S*4i</move>
+      <score>-4283</score>
+      <pv>S*4i S4h-3i S4ix5h+ N*4e +S5h-4i N4ex3c G4bx3c S*4h +S4ix4h S3ix4h S*4i S*3i R*7h P*5h R7hx5h+ B*7e G*3h K2h-1h G3hx4h</pv>
+    </analysisInfo>
+    <analysisInfo>
+      <move>   7  Resigns</move>
+      <score>-4341</score>
+      <pv>S4h-3i S4ix5h+ P*5i +S5h-4i B*6d R*7h N*5h R7hx7b+ R8ax9a+ +S4ix3i K2hx3i P*7a S*4i P*5g N*4e P5gx5h+ P5ix5h</pv>
+    </analysisInfo>
+  </analysisInfoList>
+</gameAnalysis>
