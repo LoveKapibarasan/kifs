@@ -188,7 +188,7 @@ void convertFile(const fs::path& filePath) {
             fs::remove(filePath);
             fs::rename(tmpPath, filePath);
 
-            std::cout << "  ✓ Converted to UTF-8" << std::endl;
+            std::cout << "Converted to UTF-8" << std::endl;
         }
 
     } catch (const std::exception& e) {
