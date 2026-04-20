@@ -30,6 +30,7 @@ Run the crawler to scan rankings from start_rank to end_rank.
 # Usage: python swars_crawler.py [start] [end] [game_type]
 python3 swars_crawler.py 1 100 sb
 ```
+
     * This generates `games_sb.jsonl` (JSON Lines format).
 
     * Each line contains a unique game_id, source_user, and timestamp.
@@ -42,6 +43,7 @@ Use the generated JSONL file to download actual move sequences.
 # Usage: python3 kif_downloader.py [input_jsonl]
 python3 kif_downloader.py games_sb.jsonl
 ```
+
     * KIF files are saved into the `kif_data/` directory.
 
     * The script includes a 1.5s delay between requests to respect server limits.
