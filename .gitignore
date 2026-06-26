@@ -218,8 +218,12 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Shogi game records
-*.csa
 *.kif
+*.csa
+kif_data/
+
+# Generated crawler/database artifacts
+games_*.jsonl
 kifu_db.json
 crawler_state.json
 pipeline.log
