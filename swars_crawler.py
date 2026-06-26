@@ -2,14 +2,18 @@ import os
 import asyncio
 import re
 import sys
-import json
 from datetime import datetime
-from typing import List, Set
+from typing import List
 import httpx
 from dotenv import load_dotenv
+from tinydb import TinyDB, Query
+from index_to_nosql import OrJSONStorage
 
 # Load environment variables
 load_dotenv()
+
+DB_FILE = "kifu_db.json"
+CRAWL_RECORDS_TABLE = "crawl_records"
 
 class SwarsCrawler:
     def __init__(self, game_type: str = "sb"):
@@ -62,27 +66,14 @@ class SwarsCrawler:
             print(f"  [!] History fetch error for {user_id} (page {page}): {e}")
             return []
 
-
-def deduplicate_file(filename: str):
-    """Final deduplication of the JSONL file."""
-    if not os.path.exists(filename): return
-    unique_records = {}
-    with open(filename, "r", encoding="utf-8") as f:
-        for line in f:
-            record = json.loads(line)
-            unique_records[record["game_id"]] = record
-    with open(filename, "w", encoding="utf-8") as f:
-        for record in unique_records.values():
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
-    print(f"[*] Final unique count: {len(unique_records)}")
-
 async def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Crawl Shogi Wars Game IDs.")
+    parser = argparse.ArgumentParser(description="Crawl Shogi Wars game IDs into the NoSQL database.")
     parser.add_argument("start", type=int, help="Start ranking offset (e.g., 1)")
     parser.add_argument("end", type=int, help="End ranking offset (e.g., 100)")
     parser.add_argument("game_type", nargs="?", default="sb", help="Game type: sb (3-min), s1 (10-sec), etc.")
     parser.add_argument("--pages", type=int, default=1, help="Number of pages to crawl per user (default: 1)")
+    parser.add_argument("--db", default=DB_FILE, help=f"TinyDB database path (default: {DB_FILE})")
 
     args = parser.parse_args()
     start_rank = args.start
@@ -91,9 +82,10 @@ async def main():
     max_pages = args.pages
     
     crawler = SwarsCrawler(game_type=game_type)
-    output_file = f"games_{game_type}.jsonl"
-    
-    seen_in_session: Set[str] = set()
+    db = TinyDB(args.db, storage=OrJSONStorage)
+    crawl_records = db.table(CRAWL_RECORDS_TABLE)
+    Game = Query()
+    seen_game_ids = {record["game_id"] for record in crawl_records.all() if "game_id" in record}
 
     async with httpx.AsyncClient(headers=crawler.headers, timeout=20.0) as client:
         for offset in range(start_rank, end_rank + 1, 25):
@@ -111,22 +103,20 @@ async def main():
                         await asyncio.sleep(0.5)
                 
                 new_count = 0
-                with open(output_file, "a", encoding="utf-8") as f:
-                    for gid in game_ids:
-                        if gid not in seen_in_session:
-                            f.write(json.dumps({
-                                "game_id": gid,
-                                "type": game_type,
-                                "user": uid,
-                                "ts": datetime.now().isoformat()
-                            }) + "\n")
-                            seen_in_session.add(gid)
-                            new_count += 1
+                for gid in game_ids:
+                    if gid not in seen_game_ids:
+                        crawl_records.upsert({
+                            "game_id": gid,
+                            "game_type": game_type,
+                            "source_user": uid,
+                            "discovered_at": datetime.now().isoformat()
+                        }, Game.game_id == gid)
+                        seen_game_ids.add(gid)
+                        new_count += 1
                 print(f"  [-] {uid}: +{new_count} (across {max_pages} pages)")
                 await asyncio.sleep(1.0)
 
-    deduplicate_file(output_file)
+    print(f"[*] Total crawl records in NoSQL: {len(crawl_records)}")
 
 if __name__ == "__main__":
     asyncio.run(main())
-

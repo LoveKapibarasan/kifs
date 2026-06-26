@@ -1,10 +1,9 @@
 import os
 import asyncio
-import json
-import sys
 import re
 from typing import Optional
 import httpx
+import orjson
 from dotenv import load_dotenv
 
 # Load credentials from .env
@@ -36,8 +35,8 @@ class SwarsKifDownloader:
             if not match:
                 return None
             
-            # Parse the extracted JSON string
-            data = json.loads(match.group(1).strip())
+            # Parse the data embedded in the analytics page.
+            data = orjson.loads(match.group(1).strip())
             
             # Navigate to the kif text within the nested JSON structure
             return data.get("shogi_wars", {}).get("kif")
@@ -47,13 +46,16 @@ class SwarsKifDownloader:
             return None
 
 async def main():
-    if len(sys.argv) < 2:
-        print("Usage: python3 kif_downloader.py [input_jsonl_file]")
-        return
+    import argparse
+    parser = argparse.ArgumentParser(description="Download KIF files by game ID and index them into TinyDB.")
+    parser.add_argument("game_ids", nargs="+", help="Shogi Wars game IDs to download.")
+    parser.add_argument("--db", default="kifu_db.json", help="TinyDB database path.")
+    parser.add_argument("--kif-dir", default="kif_data", help="Directory to save KIF files.")
+    parser.add_argument("--game-type", default=None, help="Optional game type metadata, e.g. sb or s1.")
+    parser.add_argument("--source-user", default=None, help="Optional crawler/source user metadata.")
+    args = parser.parse_args()
 
-    input_file = sys.argv[1]
-    save_dir = "kif_data"
-    db_path = "kifu_db.json"
+    save_dir = args.kif_dir
     
     # Create output directory if it doesn't exist
     os.makedirs(save_dir, exist_ok=True)
@@ -63,60 +65,53 @@ async def main():
     # Initialize TinyDB
     from tinydb import TinyDB, Query
     from index_to_nosql import OrJSONStorage
-    db = TinyDB(db_path, storage=OrJSONStorage)
+    db = TinyDB(args.db, storage=OrJSONStorage)
     Game = Query()
     
     async with httpx.AsyncClient(headers=downloader.headers, timeout=20.0) as client:
-        with open(input_file, "r", encoding="utf-8") as f:
-            for line in f:
-                if not line.strip():
-                    continue
-                
-                record = json.loads(line)
-                game_id = record["game_id"]
-                file_path = os.path.join(save_dir, f"{game_id}.kif")
+        for game_id in args.game_ids:
+            file_path = os.path.join(save_dir, f"{game_id}.kif")
 
-                # Check if the file was already downloaded to avoid redundant requests
-                if os.path.exists(file_path):
-                    continue
-
+            if os.path.exists(file_path):
+                print(f"[*] Already exists: {file_path}")
+            else:
                 print(f"[*] Fetching KIF for: {game_id}")
                 kif_text = await downloader.fetch_kif(client, game_id)
-                
-                if kif_text:
-                    with open(file_path, "w", encoding="utf-8") as out:
-                        out.write(kif_text)
-                    print(f"  [+] Saved: {file_path}")
-                    
-                    # Index into NoSQL on-the-fly
-                    try:
-                        from index_to_nosql import parse_kif
-                        parsed_data = parse_kif(file_path)
-                        if parsed_data:
-                            doc = {
-                                "game_id": game_id,
-                                "sente": parsed_data["sente"],
-                                "gote": parsed_data["gote"],
-                                "start_time": parsed_data["start_time"],
-                                "end_time": parsed_data["end_time"],
-                                "location": parsed_data["location"],
-                                "handicap": parsed_data["handicap"],
-                                "result": parsed_data["result"],
-                                "moves": parsed_data["moves"],
-                                "total_moves": parsed_data["total_moves"],
-                                "raw_headers": parsed_data["raw_headers"],
-                                "crawler_user": record.get("user"),
-                                "crawler_type": record.get("type"),
-                                "crawler_ts": record.get("ts")
-                            }
-                            db.upsert(doc, Game.game_id == game_id)
-                            print(f"  [+] Indexed in NoSQL database.")
-                    except Exception as ex:
-                        print(f"  [!] Failed to index in NoSQL: {ex}")
-                
-                # Polite delay to prevent server-side rate limiting
-                await asyncio.sleep(1.5)
+                if not kif_text:
+                    await asyncio.sleep(1.5)
+                    continue
+
+                with open(file_path, "w", encoding="utf-8") as out:
+                    out.write(kif_text)
+                print(f"  [+] Saved: {file_path}")
+
+            try:
+                from index_to_nosql import parse_kif
+                parsed_data = parse_kif(file_path)
+                if parsed_data:
+                    doc = {
+                        "game_id": game_id,
+                        "sente": parsed_data["sente"],
+                        "gote": parsed_data["gote"],
+                        "start_time": parsed_data["start_time"],
+                        "end_time": parsed_data["end_time"],
+                        "location": parsed_data["location"],
+                        "handicap": parsed_data["handicap"],
+                        "result": parsed_data["result"],
+                        "moves": parsed_data["moves"],
+                        "total_moves": parsed_data["total_moves"],
+                        "raw_headers": parsed_data["raw_headers"],
+                        "crawler_user": args.source_user,
+                        "crawler_type": args.game_type,
+                        "crawler_ts": None
+                    }
+                    db.upsert(doc, Game.game_id == game_id)
+                    print(f"  [+] Indexed in NoSQL database.")
+            except Exception as ex:
+                print(f"  [!] Failed to index in NoSQL: {ex}")
+
+            # Polite delay to prevent server-side rate limiting
+            await asyncio.sleep(1.5)
 
 if __name__ == "__main__":
     asyncio.run(main())
-

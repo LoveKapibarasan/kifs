@@ -29,11 +29,13 @@ logging.basicConfig(
 
 STATE_FILE = "crawler_state.json"
 DB_FILE = "kifu_db.json"
+CRAWL_RECORDS_TABLE = "crawl_records"
 
 class PipelineManager:
     def __init__(self):
         load_dotenv()
         self.db = TinyDB(DB_FILE, storage=OrJSONStorage)
+        self.crawl_records = self.db.table(CRAWL_RECORDS_TABLE)
         self.downloader = SwarsKifDownloader()
         
         # Default to 'sb' (3-min) but we can support others too
@@ -145,6 +147,14 @@ class PipelineManager:
                 for game_id in game_ids:
                     if not self.running:
                         break
+
+                    Game = Query()
+                    self.crawl_records.upsert({
+                        "game_id": game_id,
+                        "game_type": "sb",
+                        "source_user": user_id,
+                        "discovered_at": datetime.now().isoformat()
+                    }, Game.game_id == game_id)
 
                     # Discover new users from the game_id (BFS graph traversal)
                     p1, p2 = self.extract_players(game_id)

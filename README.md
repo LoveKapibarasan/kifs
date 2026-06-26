@@ -1,11 +1,12 @@
 # Shogi Wars KIF Data Pipeline
 
-将棋ウォーズの対局 ID を収集し、棋神解析ページから KIF をダウンロードして、検索しやすい JSON データベースに索引化するための Python プロジェクトです。
+将棋ウォーズの対局 ID を収集し、棋神解析ページから KIF をダウンロードして、検索しやすい NoSQL データベースに索引化するための Python プロジェクトです。
 
 ## できること
 
 - 将棋ウォーズのイベントランキングからユーザー ID を収集する
 - 各ユーザーの対局履歴から `wars_game_id` を抽出する
+- 発見した対局 ID を最初から TinyDB の `crawl_records` テーブルへ保存する
 - 棋神解析ページから KIF テキストを取得し、`kif_data/` に保存する
 - KIF の先手、後手、開始日時、終局理由、指し手などをパースする
 - TinyDB + orjson で `kifu_db.json` に索引化する
@@ -20,15 +21,14 @@
 ├── kif_downloader.py     # game_id から KIF をダウンロードして保存、同時に索引化
 ├── index_to_nosql.py     # KIF の一括索引化、検索、統計表示
 ├── run_pipeline.py       # ユーザー探索から KIF 保存、索引化までを継続実行
-├── games_sb.jsonl        # 収集済み game_id の JSON Lines
 ├── kif_data/             # ダウンロード済み .kif ファイル
-├── kifu_db.json          # TinyDB 形式の検索用 DB
+├── kifu_db.json          # TinyDB 形式の NoSQL DB
 ├── crawler_state.json    # 継続クロール用の状態ファイル
 ├── pipeline.log          # パイプライン実行ログ
 └── requirements.txt
 ```
 
-`games_*.jsonl`、`kif_data/`、`kifu_db.json`、`crawler_state.json`、`pipeline.log` は実行によって生成または更新されるデータです。
+`kif_data/`、`kifu_db.json`、`crawler_state.json`、`pipeline.log` は実行によって生成または更新されるデータです。
 
 ## セットアップ
 
@@ -52,7 +52,7 @@ WEB_SESSION=your_session_cookie_here
 
 ### 1. 対局 ID を収集する
 
-ランキングの `start` オフセット範囲を 25 件刻みで巡回し、見つかったユーザーの対局履歴から game_id を保存します。
+ランキングの `start` オフセット範囲を 25 件刻みで巡回し、見つかったユーザーの対局履歴から game_id を `kifu_db.json` の `crawl_records` テーブルへ保存します。
 
 ```bash
 python3 swars_crawler.py 1 100 sb --pages 2
@@ -64,18 +64,19 @@ python3 swars_crawler.py 1 100 sb --pages 2
 - `end`: ランキング取得終了オフセット
 - `game_type`: 対局種別。省略時は `sb`
 - `--pages`: ユーザーごとに読む履歴ページ数。省略時は `1`
+- `--db`: 保存先 TinyDB。省略時は `kifu_db.json`
 
-出力先は `games_<game_type>.jsonl` です。例では `games_sb.jsonl` が作成または追記されます。終了時に同一 game_id は重複排除されます。
+同一 game_id は `crawl_records` テーブル内で upsert されるため、重複した中間ファイルは作成しません。
 
-### 2. KIF をダウンロードする
+### 2. 対局 ID を指定して KIF をダウンロードする
 
-収集済み JSONL を入力にして、棋神解析ページから KIF を取得します。
+単発または少数の game_id を指定して、棋神解析ページから KIF を取得します。
 
 ```bash
-python3 kif_downloader.py games_sb.jsonl
+python3 kif_downloader.py "playerA-playerB-20260617_120000"
 ```
 
-KIF は `kif_data/<game_id>.kif` に保存されます。保存できた KIF はその場でパースされ、`kifu_db.json` に upsert されます。既に同名 KIF ファイルがある場合はスキップします。
+KIF は `kif_data/<game_id>.kif` に保存されます。保存できた KIF はその場でパースされ、`kifu_db.json` の対局テーブルへ upsert されます。既に同名 KIF ファイルがある場合は再ダウンロードせず、索引化だけ実行します。
 
 ### 3. KIF を一括で索引化する
 
@@ -88,7 +89,7 @@ python3 index_to_nosql.py --index
 入力ディレクトリや DB パスを変える場合:
 
 ```bash
-python3 index_to_nosql.py --index --kif-dir kif_data --jsonl-dir . --db kifu_db.json
+python3 index_to_nosql.py --index --kif-dir kif_data --db kifu_db.json
 ```
 
 ### 4. 検索する
@@ -109,12 +110,6 @@ python3 index_to_nosql.py --search --player "playerName" --limit 20
 
 ```bash
 python3 index_to_nosql.py --search --sente "playerA" --gote "playerB" --result "投了" --min-moves 80
-```
-
-検索結果を JSON にエクスポート:
-
-```bash
-python3 index_to_nosql.py --search --player "playerName" --export results.json
 ```
 
 ### 5. DB 統計を表示する
@@ -138,6 +133,7 @@ python3 run_pipeline.py
 - `crawler_state.json` からクロール済みユーザーと待ち行列を復元する
 - 待ち行列が空ならランキングから初期ユーザーを取得する
 - 各ユーザーの `sb` 対局履歴を最大 3 ページ取得する
+- 発見した game_id を `crawl_records` テーブルへ保存する
 - game_id から対局者名を抽出し、未処理ユーザーをキューに追加する
 - 未索引の対局だけ KIF を取得して DB に追加する
 - 5 ユーザーごとに状態を保存する
@@ -145,19 +141,9 @@ python3 run_pipeline.py
 
 停止時は `SIGINT` / `SIGTERM` を受けて状態保存を試みます。
 
-## データ形式
+## NoSQL データ
 
-### `games_*.jsonl`
-
-1 行 1 対局の JSON Lines です。
-
-```json
-{"game_id":"playerA-playerB-20260617_120000","type":"sb","user":"playerA","ts":"2026-06-17T06:00:00.000000"}
-```
-
-### `kifu_db.json`
-
-TinyDB の JSON ファイルです。各ドキュメントには主に次のフィールドが入ります。
+`kifu_db.json` は TinyDB のデータファイルです。対局テーブルの各ドキュメントには主に次のフィールドが入ります。
 
 - `game_id`
 - `sente`
@@ -173,6 +159,13 @@ TinyDB の JSON ファイルです。各ドキュメントには主に次のフ�
 - `crawler_user`
 - `crawler_type`
 - `crawler_ts`
+
+`crawl_records` テーブルには、クロールで発見した未ダウンロードを含む対局 ID が保存されます。
+
+- `game_id`
+- `game_type`
+- `source_user`
+- `discovered_at`
 
 ## 注意
 

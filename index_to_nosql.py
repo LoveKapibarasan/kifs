@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 import os
 import glob
-import json
-import sys
 import argparse
 import orjson
 from tinydb import TinyDB, Query
 from tinydb.storages import Storage
+
+CRAWL_RECORDS_TABLE = "crawl_records"
 
 
 class OrJSONStorage(Storage):
@@ -99,9 +99,9 @@ def parse_kif(file_path: str):
         "raw_headers": headers
     }
 
-def index_games(db_path: str, kif_dir: str, jsonl_dir: str):
+def index_games(db_path: str, kif_dir: str):
     """
-    Scans KIF files and metadata JSONL files, then indexes them in TinyDB.
+    Scans KIF files, then indexes them in TinyDB.
     """
     print(f"[*] Initializing database at: {db_path}")
     db = TinyDB(db_path, storage=OrJSONStorage)
@@ -110,32 +110,6 @@ def index_games(db_path: str, kif_dir: str, jsonl_dir: str):
     existing_ids = {doc["game_id"] for doc in db.all() if "game_id" in doc}
     print(f"[*] Found {len(existing_ids)} games already indexed in the database.")
 
-    # 1. Load crawler metadata from any games_*.jsonl files
-    crawler_metadata = {}
-    jsonl_pattern = os.path.join(jsonl_dir, "games_*.jsonl")
-    jsonl_files = glob.glob(jsonl_pattern)
-    
-    print(f"[*] Scanning metadata files: {jsonl_files}")
-    for jsonl_file in jsonl_files:
-        try:
-            with open(jsonl_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    if not line.strip():
-                        continue
-                    record = json.loads(line)
-                    game_id = record.get("game_id")
-                    if game_id:
-                        crawler_metadata[game_id] = {
-                            "crawler_user": record.get("user"),
-                            "crawler_type": record.get("type"),
-                            "crawler_ts": record.get("ts")
-                        }
-        except Exception as e:
-            print(f"[!] Error reading metadata file {jsonl_file}: {e}")
-
-    print(f"[*] Loaded crawler metadata for {len(crawler_metadata)} games.")
-
-    # 2. Scan and parse KIF files
     kif_pattern = os.path.join(kif_dir, "*.kif")
     kif_files = glob.glob(kif_pattern)
     print(f"[*] Found {len(kif_files)} KIF files in {kif_dir}.")
@@ -156,7 +130,6 @@ def index_games(db_path: str, kif_dir: str, jsonl_dir: str):
         if not parsed_data:
             continue
 
-        # Create the database document
         doc = {
             "game_id": game_id,
             "sente": parsed_data["sente"],
@@ -174,13 +147,6 @@ def index_games(db_path: str, kif_dir: str, jsonl_dir: str):
             "crawler_ts": None
         }
 
-        # Merge crawler metadata if available
-        if game_id in crawler_metadata:
-            meta = crawler_metadata[game_id]
-            doc["crawler_user"] = meta["crawler_user"]
-            doc["crawler_type"] = meta["crawler_type"]
-            doc["crawler_ts"] = meta["crawler_ts"]
-
         new_docs.append(doc)
         processed_count += 1
 
@@ -197,7 +163,7 @@ def index_games(db_path: str, kif_dir: str, jsonl_dir: str):
 
     print(f"[+] Indexing completed: {processed_count} indexed, {skipped_count} skipped (already in database). Total database count: {len(db)}")
 
-def search_games(db_path: str, game_id: str = None, player: str = None, sente: str = None, gote: str = None, result: str = None, min_moves: int = None, limit: int = 10, export_path: str = None):
+def search_games(db_path: str, game_id: str = None, player: str = None, sente: str = None, gote: str = None, result: str = None, min_moves: int = None, limit: int = 10):
     """
     Search games inside the TinyDB database. Optimized for fast GameID and Player search.
     """
@@ -243,12 +209,6 @@ def search_games(db_path: str, game_id: str = None, player: str = None, sente: s
 
     if len(results) > limit:
         print(f"\n... and {len(results) - limit} more games.")
-
-    # Export to JSON
-    if export_path:
-        with open(export_path, "w", encoding="utf-8") as f:
-            json.dump(results, f, ensure_ascii=False, indent=2)
-        print(f"\n[+] Exported all {len(results)} matches to {export_path}")
 
 def print_db_stats(db_path: str):
     """
@@ -303,7 +263,6 @@ def main():
     parser = argparse.ArgumentParser(description="Index Shogi KIF records into TinyDB NoSQL database.")
     parser.add_argument("--db", type=str, default="kifu_db.json", help="Path to the TinyDB JSON database file.")
     parser.add_argument("--kif-dir", type=str, default="kif_data", help="Directory containing raw KIF files.")
-    parser.add_argument("--jsonl-dir", type=str, default=".", help="Directory containing games_*.jsonl metadata files.")
     
     # Actions
     parser.add_argument("--index", action="store_true", help="Perform indexing of new KIF files.")
@@ -318,12 +277,11 @@ def main():
     parser.add_argument("--result", type=str, help="Search by result (e.g. 投了, 千日手, 切れ負け).")
     parser.add_argument("--min-moves", type=int, help="Search for games with at least this number of moves.")
     parser.add_argument("--limit", type=int, default=10, help="Limit search results displayed (default: 10).")
-    parser.add_argument("--export", type=str, help="Export search results to a JSON file.")
 
     args = parser.parse_args()
 
     if args.index:
-        index_games(args.db, args.kif_dir, args.jsonl_dir)
+        index_games(args.db, args.kif_dir)
     elif args.search:
         search_games(
             args.db, 
@@ -333,8 +291,7 @@ def main():
             gote=args.gote, 
             result=args.result, 
             min_moves=args.min_moves,
-            limit=args.limit,
-            export_path=args.export
+            limit=args.limit
         )
     elif args.stats:
         print_db_stats(args.db)
@@ -343,4 +300,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
