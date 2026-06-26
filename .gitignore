@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Shogi game records
+*.csa
+*.kif
+kifu_db.json
+crawler_state.json
+pipeline.log

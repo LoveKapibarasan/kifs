@@ -53,11 +53,18 @@ async def main():
 
     input_file = sys.argv[1]
     save_dir = "kif_data"
+    db_path = "kifu_db.json"
     
     # Create output directory if it doesn't exist
     os.makedirs(save_dir, exist_ok=True)
 
     downloader = SwarsKifDownloader()
+    
+    # Initialize TinyDB
+    from tinydb import TinyDB, Query
+    from index_to_nosql import OrJSONStorage
+    db = TinyDB(db_path, storage=OrJSONStorage)
+    Game = Query()
     
     async with httpx.AsyncClient(headers=downloader.headers, timeout=20.0) as client:
         with open(input_file, "r", encoding="utf-8") as f:
@@ -80,9 +87,36 @@ async def main():
                     with open(file_path, "w", encoding="utf-8") as out:
                         out.write(kif_text)
                     print(f"  [+] Saved: {file_path}")
+                    
+                    # Index into NoSQL on-the-fly
+                    try:
+                        from index_to_nosql import parse_kif
+                        parsed_data = parse_kif(file_path)
+                        if parsed_data:
+                            doc = {
+                                "game_id": game_id,
+                                "sente": parsed_data["sente"],
+                                "gote": parsed_data["gote"],
+                                "start_time": parsed_data["start_time"],
+                                "end_time": parsed_data["end_time"],
+                                "location": parsed_data["location"],
+                                "handicap": parsed_data["handicap"],
+                                "result": parsed_data["result"],
+                                "moves": parsed_data["moves"],
+                                "total_moves": parsed_data["total_moves"],
+                                "raw_headers": parsed_data["raw_headers"],
+                                "crawler_user": record.get("user"),
+                                "crawler_type": record.get("type"),
+                                "crawler_ts": record.get("ts")
+                            }
+                            db.upsert(doc, Game.game_id == game_id)
+                            print(f"  [+] Indexed in NoSQL database.")
+                    except Exception as ex:
+                        print(f"  [!] Failed to index in NoSQL: {ex}")
                 
                 # Polite delay to prevent server-side rate limiting
                 await asyncio.sleep(1.5)
 
 if __name__ == "__main__":
     asyncio.run(main())
+

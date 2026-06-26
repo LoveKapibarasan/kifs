@@ -43,18 +43,25 @@ class SwarsCrawler:
             print(f"  [!] Ranking fetch error at {offset}: {e}")
             return []
 
-    async def fetch_game_ids(self, client: httpx.AsyncClient, user_id: str) -> List[str]:
-        """Fetch Game IDs for a user with specific game_type."""
+    async def fetch_game_ids(self, client: httpx.AsyncClient, user_id: str, page: int = 1) -> List[str]:
+        """Fetch Game IDs for a user with specific game_type and page number."""
         url = "https://shogiwars.heroz.jp/games/history"
         # gtype is now dynamic (sb, s1, etc.)
-        params = {"gtype": self.game_type, "user_id": user_id, "locale": "ja"}
+        params = {
+            "gtype": self.game_type,
+            "user_id": user_id,
+            "locale": "ja",
+            "page": page,
+            "init_pos_type": "normal"
+        }
         try:
             response = await client.get(url, params=params)
             response.raise_for_status()
             return self.game_id_pattern.findall(response.text)
         except Exception as e:
-            print(f"  [!] History fetch error for {user_id}: {e}")
+            print(f"  [!] History fetch error for {user_id} (page {page}): {e}")
             return []
+
 
 def deduplicate_file(filename: str):
     """Final deduplication of the JSONL file."""
@@ -70,15 +77,18 @@ def deduplicate_file(filename: str):
     print(f"[*] Final unique count: {len(unique_records)}")
 
 async def main():
-    if len(sys.argv) < 3:
-        print("Usage: python swars_crawler.py [start] [end] [game_type (optional)]")
-        print("Example: python swars_crawler.py 1 100 s1")
-        return
+    import argparse
+    parser = argparse.ArgumentParser(description="Crawl Shogi Wars Game IDs.")
+    parser.add_argument("start", type=int, help="Start ranking offset (e.g., 1)")
+    parser.add_argument("end", type=int, help="End ranking offset (e.g., 100)")
+    parser.add_argument("game_type", nargs="?", default="sb", help="Game type: sb (3-min), s1 (10-sec), etc.")
+    parser.add_argument("--pages", type=int, default=1, help="Number of pages to crawl per user (default: 1)")
 
-    start_rank = int(sys.argv[1])
-    end_rank = int(sys.argv[2])
-    # Default to 'sb' (3-min) if not specified
-    game_type = sys.argv[3] if len(sys.argv) > 3 else "sb"
+    args = parser.parse_args()
+    start_rank = args.start
+    end_rank = args.end
+    game_type = args.game_type
+    max_pages = args.pages
     
     crawler = SwarsCrawler(game_type=game_type)
     output_file = f"games_{game_type}.jsonl"
@@ -91,7 +101,15 @@ async def main():
             user_ids = await crawler.fetch_user_ids(client, offset)
             
             for uid in user_ids:
-                game_ids = await crawler.fetch_game_ids(client, uid)
+                game_ids = []
+                for p in range(1, max_pages + 1):
+                    p_game_ids = await crawler.fetch_game_ids(client, uid, page=p)
+                    if not p_game_ids:
+                        break
+                    game_ids.extend(p_game_ids)
+                    if p < max_pages:
+                        await asyncio.sleep(0.5)
+                
                 new_count = 0
                 with open(output_file, "a", encoding="utf-8") as f:
                     for gid in game_ids:
@@ -104,10 +122,11 @@ async def main():
                             }) + "\n")
                             seen_in_session.add(gid)
                             new_count += 1
-                print(f"  [-] {uid}: +{new_count}")
+                print(f"  [-] {uid}: +{new_count} (across {max_pages} pages)")
                 await asyncio.sleep(1.0)
 
     deduplicate_file(output_file)
 
 if __name__ == "__main__":
     asyncio.run(main())
+
