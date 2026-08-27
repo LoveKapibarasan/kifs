@@ -12,7 +12,13 @@ import httpx
 from dotenv import load_dotenv
 
 # Import NoSQL and crawler/downloader modules
-from index_to_nosql import OrJSONStorage, parse_kif
+from index_to_nosql import (
+    OrJSONStorage,
+    STATUS_INDEXED,
+    STATUS_KIF_DOWNLOADED,
+    STATUS_KIF_MISSING,
+    parse_kif,
+)
 from swars_crawler import SwarsCrawler
 from kif_downloader import SwarsKifDownloader
 from tinydb import TinyDB, Query
@@ -149,12 +155,16 @@ class PipelineManager:
                         break
 
                     Game = Query()
-                    self.crawl_records.upsert({
-                        "game_id": game_id,
-                        "game_type": "sb",
-                        "source_user": user_id,
-                        "discovered_at": datetime.now().isoformat()
-                    }, Game.game_id == game_id)
+                    if not self.crawl_records.contains(Game.game_id == game_id):
+                        self.crawl_records.insert({
+                            "game_id": game_id,
+                            "game_type": "sb",
+                            "source_user": user_id,
+                            "discovered_at": datetime.now().isoformat(),
+                            "kif_status": STATUS_KIF_MISSING,
+                            "has_kif_file": False,
+                            "is_indexed": False
+                        })
 
                     # Discover new users from the game_id (BFS graph traversal)
                     p1, p2 = self.extract_players(game_id)
@@ -175,8 +185,20 @@ class PipelineManager:
                                 os.makedirs("kif_data", exist_ok=True)
                                 with open(file_path, "w", encoding="utf-8") as out:
                                     out.write(kif_text)
+                                self.crawl_records.update({
+                                    "kif_status": STATUS_KIF_DOWNLOADED,
+                                    "has_kif_file": True,
+                                    "last_attempt_at": datetime.now().isoformat(),
+                                    "last_error": None
+                                }, Game.game_id == game_id)
                                 await asyncio.sleep(1.5) # Polite delay
                             else:
+                                self.crawl_records.update({
+                                    "kif_status": STATUS_KIF_MISSING,
+                                    "has_kif_file": False,
+                                    "last_attempt_at": datetime.now().isoformat(),
+                                    "last_error": "KIF not found in analytics response"
+                                }, Game.game_id == game_id)
                                 continue
                         
                         # Parse and index in TinyDB NoSQL
@@ -187,6 +209,8 @@ class PipelineManager:
                                     "game_id": game_id,
                                     "sente": parsed_data["sente"],
                                     "gote": parsed_data["gote"],
+                                    "sente_rank": parsed_data["sente_rank"],
+                                    "gote_rank": parsed_data["gote_rank"],
                                     "start_time": parsed_data["start_time"],
                                     "end_time": parsed_data["end_time"],
                                     "location": parsed_data["location"],
@@ -200,9 +224,23 @@ class PipelineManager:
                                     "crawler_ts": datetime.now().isoformat()
                                 }
                                 self.db.insert(doc)
+                                self.crawl_records.update({
+                                    "kif_status": STATUS_INDEXED,
+                                    "has_kif_file": True,
+                                    "is_indexed": True,
+                                    "indexed_at": datetime.now().isoformat(),
+                                    "last_error": None
+                                }, Game.game_id == game_id)
                                 self.indexed_game_ids.add(game_id)
                                 new_game_count += 1
                         except Exception as e:
+                            self.crawl_records.update({
+                                "kif_status": STATUS_KIF_DOWNLOADED,
+                                "has_kif_file": os.path.exists(file_path),
+                                "is_indexed": False,
+                                "last_attempt_at": datetime.now().isoformat(),
+                                "last_error": f"Indexing failed: {e}"
+                            }, Game.game_id == game_id)
                             logging.error(f"    Failed to index {game_id}: {e}")
 
                 logging.info(f"  Finished {user_id}: +{new_game_count} new games indexed.")

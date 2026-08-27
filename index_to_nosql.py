@@ -2,11 +2,15 @@
 import os
 import glob
 import argparse
+from datetime import datetime
 import orjson
 from tinydb import TinyDB, Query
 from tinydb.storages import Storage
 
 CRAWL_RECORDS_TABLE = "crawl_records"
+STATUS_KIF_MISSING = "kif_missing"
+STATUS_KIF_DOWNLOADED = "kif_downloaded"
+STATUS_INDEXED = "indexed"
 
 
 class OrJSONStorage(Storage):
@@ -20,8 +24,14 @@ class OrJSONStorage(Storage):
             return orjson.loads(f.read())
 
     def write(self, data):
-        with open(self.filename, 'wb') as f:
+        # Write atomically (temp file -> fsync -> rename) so an interrupted
+        # write (e.g. process killed mid-dump) cannot truncate/corrupt the DB.
+        tmp = f"{self.filename}.tmp"
+        with open(tmp, 'wb') as f:
             f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2))
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, self.filename)
 
     def close(self):
         pass
@@ -85,10 +95,15 @@ def parse_kif(file_path: str):
     end_time = headers.get("終了日時")
     location = headers.get("場所")
     handicap = headers.get("手合割")
+    # Rank at game time, present in KIFs from the new analytics API (else None).
+    sente_rank = headers.get("先手段級") or headers.get("下手段級")
+    gote_rank = headers.get("後手段級") or headers.get("上手段級")
 
     return {
         "sente": sente,
         "gote": gote,
+        "sente_rank": sente_rank,
+        "gote_rank": gote_rank,
         "start_time": start_time,
         "end_time": end_time,
         "location": location,
@@ -134,6 +149,8 @@ def index_games(db_path: str, kif_dir: str):
             "game_id": game_id,
             "sente": parsed_data["sente"],
             "gote": parsed_data["gote"],
+            "sente_rank": parsed_data["sente_rank"],
+            "gote_rank": parsed_data["gote_rank"],
             "start_time": parsed_data["start_time"],
             "end_time": parsed_data["end_time"],
             "location": parsed_data["location"],
@@ -162,6 +179,52 @@ def index_games(db_path: str, kif_dir: str):
         print("[*] No new games to index.")
 
     print(f"[+] Indexing completed: {processed_count} indexed, {skipped_count} skipped (already in database). Total database count: {len(db)}")
+    sync_crawl_status(db_path, kif_dir)
+
+def sync_crawl_status(db_path: str, kif_dir: str):
+    """
+    Reconciles crawl_records with local KIF files and indexed game documents.
+    """
+    db = TinyDB(db_path, storage=OrJSONStorage)
+    crawl_records = db.table(CRAWL_RECORDS_TABLE)
+    records = crawl_records.all()
+    if not records:
+        print("[*] No crawl records to sync.")
+        return
+
+    indexed_ids = {doc["game_id"] for doc in db.table("_default").all() if "game_id" in doc}
+    synced_at = datetime.now().isoformat()
+    updated_records = []
+    counts = {}
+
+    for record in records:
+        game_id = record.get("game_id")
+        if not game_id:
+            continue
+
+        has_kif_file = os.path.exists(os.path.join(kif_dir, f"{game_id}.kif"))
+        if game_id in indexed_ids:
+            status = STATUS_INDEXED
+        elif has_kif_file:
+            status = STATUS_KIF_DOWNLOADED
+        else:
+            status = STATUS_KIF_MISSING
+
+        updated = dict(record)
+        updated["kif_status"] = status
+        updated["has_kif_file"] = has_kif_file
+        updated["is_indexed"] = game_id in indexed_ids
+        updated["status_synced_at"] = synced_at
+        updated_records.append(updated)
+        counts[status] = counts.get(status, 0) + 1
+
+    crawl_records.truncate()
+    if updated_records:
+        crawl_records.insert_multiple(updated_records)
+
+    print("[+] Crawl status synced:")
+    for status, count in sorted(counts.items()):
+        print(f"    {status}: {count}")
 
 def search_games(db_path: str, game_id: str = None, player: str = None, sente: str = None, gote: str = None, result: str = None, min_moves: int = None, limit: int = 10):
     """
@@ -259,6 +322,17 @@ def print_db_stats(db_path: str):
     for name, count in sorted_players[:5]:
         print(f"  {name}: {count} games")
 
+    crawl_records = db.table(CRAWL_RECORDS_TABLE).all()
+    if crawl_records:
+        status_counts = {}
+        for record in crawl_records:
+            status = record.get("kif_status", "unknown")
+            status_counts[status] = status_counts.get(status, 0) + 1
+        print("\n--- Crawl Record Status ---")
+        print(f"  Total Crawl Records: {len(crawl_records)}")
+        for status, count in sorted(status_counts.items()):
+            print(f"  {status}: {count}")
+
 def main():
     parser = argparse.ArgumentParser(description="Index Shogi KIF records into TinyDB NoSQL database.")
     parser.add_argument("--db", type=str, default="kifu_db.json", help="Path to the TinyDB JSON database file.")
@@ -268,6 +342,7 @@ def main():
     parser.add_argument("--index", action="store_true", help="Perform indexing of new KIF files.")
     parser.add_argument("--search", action="store_true", help="Search the indexed database.")
     parser.add_argument("--stats", action="store_true", help="Show database statistics.")
+    parser.add_argument("--sync-crawl-status", action="store_true", help="Mark crawl records as indexed, downloaded, or KIF missing.")
     
     # Search parameters
     parser.add_argument("--game-id", type=str, help="Search by unique Game ID.")
@@ -282,6 +357,8 @@ def main():
 
     if args.index:
         index_games(args.db, args.kif_dir)
+    elif args.sync_crawl_status:
+        sync_crawl_status(args.db, args.kif_dir)
     elif args.search:
         search_games(
             args.db, 

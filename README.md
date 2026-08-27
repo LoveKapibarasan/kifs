@@ -78,6 +78,18 @@ python3 kif_downloader.py "playerA-playerB-20260617_120000"
 
 KIF は `kif_data/<game_id>.kif` に保存されます。保存できた KIF はその場でパースされ、`kifu_db.json` の対局テーブルへ upsert されます。既に同名 KIF ファイルがある場合は再ダウンロードせず、索引化だけ実行します。
 
+`crawl_records` にあるが KIF が未取得の対局だけを再試行する場合:
+
+```bash
+python3 kif_downloader.py --missing
+```
+
+件数を絞る場合:
+
+```bash
+python3 kif_downloader.py --missing --limit 20
+```
+
 ### 3. KIF を一括で索引化する
 
 既存の `kif_data/*.kif` をまとめて読み直し、まだ DB にない対局を `kifu_db.json` に追加します。
@@ -118,7 +130,13 @@ python3 index_to_nosql.py --search --sente "playerA" --gote "playerB" --result "
 python3 index_to_nosql.py --stats
 ```
 
-総対局数、ユニークプレイヤー数、平均手数、終局理由の分布、対局数上位プレイヤーを表示します。
+総対局数、ユニークプレイヤー数、平均手数、終局理由の分布、対局数上位プレイヤー、`crawl_records` の KIF 取得状態を表示します。
+
+`crawl_records` とローカルの `kif_data/`、索引済み対局テーブルの状態を同期する場合:
+
+```bash
+python3 index_to_nosql.py --sync-crawl-status
+```
 
 ## 継続パイプライン
 
@@ -166,6 +184,17 @@ python3 run_pipeline.py
 - `game_type`
 - `source_user`
 - `discovered_at`
+- `kif_status`: `kif_missing`、`kif_downloaded`、`indexed`
+- `has_kif_file`
+- `is_indexed`
+- `last_attempt_at`
+- `last_error`
+
+`kif_status` の意味:
+
+- `kif_missing`: game_id は取得済みだが、対応する KIF はまだ取得できていない
+- `kif_downloaded`: KIF ファイルはローカルにあるが、対局テーブルへの索引化は未完了
+- `indexed`: KIF 取得と対局テーブルへの索引化が完了済み
 
 ## 注意
 

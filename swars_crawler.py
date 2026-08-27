@@ -7,7 +7,7 @@ from typing import List
 import httpx
 from dotenv import load_dotenv
 from tinydb import TinyDB, Query
-from index_to_nosql import OrJSONStorage
+from index_to_nosql import OrJSONStorage, STATUS_KIF_MISSING
 
 # Load environment variables
 load_dotenv()
@@ -109,7 +109,10 @@ async def main():
                             "game_id": gid,
                             "game_type": game_type,
                             "source_user": uid,
-                            "discovered_at": datetime.now().isoformat()
+                            "discovered_at": datetime.now().isoformat(),
+                            "kif_status": STATUS_KIF_MISSING,
+                            "has_kif_file": False,
+                            "is_indexed": False
                         }, Game.game_id == gid)
                         seen_game_ids.add(gid)
                         new_count += 1
