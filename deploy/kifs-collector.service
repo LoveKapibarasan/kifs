@@ -1,0 +1,37 @@
+[Unit]
+Description=Shogi Wars KIF collector
+Documentation=https://github.com/LoveKapibarasan/kifs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=%h/kifs
+Environment=KIFS_DATA_DIR=%h/kifs-data
+Environment=PYTHONUNBUFFERED=1
+# Credentials come from Infisical; the machine identity lives in ~/.env.global.
+ExecStart=%h/kifs/.venv/bin/kifs --no-log-file serve
+
+Restart=always
+RestartSec=30
+# Give the collector time to flush the in-memory database on SIGTERM.
+KillSignal=SIGTERM
+TimeoutStopSec=180
+
+# The service only ever needs its checkout, its data directory and ~/.env.global.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/kifs-data
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kifs
+
+[Install]
+WantedBy=default.target
