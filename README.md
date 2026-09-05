@@ -58,7 +58,7 @@ kifs secrets check     # どの経路で解決されたか確認
 kifs secrets push      # 環境変数の値を Infisical へ登録し直す (Cookie失効時)
 ```
 
-Infisical を使わない場合は `--no-infisical` を付け、環境変数か `.env` (`.env.example` 参照) に置きます。
+解決順序は **Infisical → 環境変数 → repo直下の `.env`** です。`.env` はフォールバックとして機能します (`.gitignore` 済み、`.env.example` 参照)。Infisical を使わない場合は `--no-infisical` を付けると `.env` / 環境変数だけを見ます。
 
 ## 使い方
 

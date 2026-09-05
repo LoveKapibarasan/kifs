@@ -78,7 +78,9 @@ kifs secrets push
 systemctl --user restart kifs-collector
 ```
 
-`kifs secrets check` で反映を確認できます。
+`kifs secrets check` で反映を確認できます (`source:` がどの経路で解決したかを示します)。
+
+Infisical に到達できないときは環境変数、次に repo 直下の `.env` にフォールバックします。`.env` は削除せず、Infisical が使えない環境での退避経路として残してあります。
 
 ## 収集ペースの調整
 
