@@ -220,10 +220,19 @@ __marimo__/
 # Shogi game records
 *.kif
 *.csa
-kif_data/
 
 # Generated crawler/database artifacts
 games_*.jsonl
+
+# --- kifs generated data (see docs/architecture.md) ---
+data/
+logs/
+# legacy v1 layout, kept ignored so old checkouts stay clean
+kif_data/
 kifu_db.json
 crawler_state.json
+user_ranks.json
 pipeline.log
+converted/
+human_data/
+human_data.tar.gz

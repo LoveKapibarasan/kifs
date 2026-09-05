@@ -1,204 +1,127 @@
-# Shogi Wars KIF Data Pipeline
+# kifs — Shogi Wars KIF collection pipeline
 
-将棋ウォーズの対局 ID を収集し、棋神解析ページから KIF をダウンロードして、検索しやすい NoSQL データベースに索引化するための Python プロジェクトです。
+将棋ウォーズの対局を**もれなく・重複なく**集め続けるためのパイプラインです。ユーザーを辿って対局IDを見つけ、棋神解析APIからKIFを取得し、検索可能なNoSQL (TinyDB形式のJSON) に索引化します。作業台上では systemd サービスとして常駐します。
 
-## できること
-
-- 将棋ウォーズのイベントランキングからユーザー ID を収集する
-- 各ユーザーの対局履歴から `wars_game_id` を抽出する
-- 発見した対局 ID を最初から TinyDB の `crawl_records` テーブルへ保存する
-- 棋神解析ページから KIF テキストを取得し、`kif_data/` に保存する
-- KIF の先手、後手、開始日時、終局理由、指し手などをパースする
-- TinyDB + orjson で `kifu_db.json` に索引化する
-- 対局 ID、プレイヤー名、手数、結果などで検索する
-- `run_pipeline.py` でクロール、ダウンロード、索引化を継続実行する
+```
+ランキング/対局履歴 ──> フロンティア(ユーザー) ──> crawl_records ──> KIF取得 ──> 索引化
+   shogiwars.heroz.jp                                    kishin-analytics.heroz.jp
+```
 
 ## 構成
 
-```text
-.
-├── swars_crawler.py      # ランキングと対局履歴から game_id を収集
-├── kif_downloader.py     # game_id から KIF をダウンロードして保存、同時に索引化
-├── index_to_nosql.py     # KIF の一括索引化、検索、統計表示
-├── run_pipeline.py       # ユーザー探索から KIF 保存、索引化までを継続実行
-├── kif_data/             # ダウンロード済み .kif ファイル
-├── kifu_db.json          # TinyDB 形式の NoSQL DB
-├── crawler_state.json    # 継続クロール用の状態ファイル
-├── pipeline.log          # パイプライン実行ログ
-└── requirements.txt
+```
+src/kifs/
+  config.py            設定・全パス・認証情報の解決を一元化
+  clients/             shogiwars.py (Rails HTML) / kishin.py (KIF API)
+  kif/parser.py        KIFパース (I/OもDBも持たない)
+  storage/             jsonstore.py (バッファ書き込み) / database.py / frontier.py / lock.py
+  pipeline/            discovery → downloader → indexer、service.py が常駐ループ
+  ranks/               mypage からの段位取得・付与・バックフィル
+  query/               検索と統計
+  cli.py               唯一のエントリポイント (kifs ...)
+deploy/                systemd unit とインストーラ
+scripts/               v1レイアウトからの移行スクリプト
+docs/                  設計と運用手順
+data/                  生成データ (gitignore)
 ```
 
-`kif_data/`、`kifu_db.json`、`crawler_state.json`、`pipeline.log` は実行によって生成または更新されるデータです。
+依存は一方向です: `cli → pipeline → {clients, storage, kif}`。KIFを索引化する処理は `pipeline/indexer.py` の1箇所だけにあります (v1では3ファイルに重複していました)。
+
+## データ配置
+
+すべて `KIFS_DATA_DIR` (既定 `./data`) の下にあります。
+
+```
+data/
+├── kif/                    ダウンロード済み .kif
+├── kifu_db.json            対局DB + crawl_records (TinyDB形式)
+├── state/
+│   ├── frontier.json       ユーザー巡回状態
+│   └── user_ranks.json     段位キャッシュ
+├── logs/
+└── derived/                KIF由来の学習データ (csa / hcpe)
+```
+
+`kifu_db.json` は TinyDB がそのまま読める形式のままです (`tests/test_storage.py` で検証)。
 
 ## セットアップ
 
-Python 3 の仮想環境を作成し、依存パッケージをインストールします。
-
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+.venv/bin/pip install -e ".[dev]"
 ```
 
-プロジェクトルートに `.env` を作成し、将棋ウォーズのセッション Cookie を設定します。
-
-```text
-WEB_SESSION=your_session_cookie_here
-```
-
-`swars_crawler.py` は `WEB_SESSION` が未設定だと終了します。`kif_downloader.py` は Cookie なしでも初期化できますが、実運用では設定しておく前提です。
-
-## 基本的な使い方
-
-### 1. 対局 ID を収集する
-
-ランキングの `start` オフセット範囲を 25 件刻みで巡回し、見つかったユーザーの対局履歴から game_id を `kifu_db.json` の `crawl_records` テーブルへ保存します。
+シークレット (`WEB_SESSION` / `ANALYTICS_SESSION`) は Infisical の **Kifs** プロジェクト (`env.lovekapibarasan.org`, env `prod`) から取得します。認証は `~/.env.global` の `INFISICAL_KIFS_CLIENT_ID` / `_CLIENT_SECRET` / `_ENDPOINT`。
 
 ```bash
-python3 swars_crawler.py 1 100 sb --pages 2
+kifs secrets check     # どの経路で解決されたか確認
+kifs secrets push      # 環境変数の値を Infisical へ登録し直す (Cookie失効時)
 ```
 
-引数:
+Infisical を使わない場合は `--no-infisical` を付け、環境変数か `.env` (`.env.example` 参照) に置きます。
 
-- `start`: ランキング取得開始オフセット
-- `end`: ランキング取得終了オフセット
-- `game_type`: 対局種別。省略時は `sb`
-- `--pages`: ユーザーごとに読む履歴ページ数。省略時は `1`
-- `--db`: 保存先 TinyDB。省略時は `kifu_db.json`
-
-同一 game_id は `crawl_records` テーブル内で upsert されるため、重複した中間ファイルは作成しません。
-
-### 2. 対局 ID を指定して KIF をダウンロードする
-
-単発または少数の game_id を指定して、棋神解析ページから KIF を取得します。
+## 使い方
 
 ```bash
-python3 kif_downloader.py "playerA-playerB-20260617_120000"
+kifs serve                       # 常駐収集 (systemd が起動するもの)
+kifs serve --max-cycles 3        # 3ユーザー分だけ回して終了 (動作確認用)
+kifs crawl --users 10            # 単発クロール
+kifs download <game_id> ...      # 対局IDを指定して取得
+kifs download --limit 200        # 再試行待ちのバックログを処理
+kifs reconcile                   # ディスク上の .kif とDBを突き合わせ
+kifs status                      # 収集状況をJSONで出力
+kifs stats                       # データセットの統計
+kifs search --player takachang2 --min-moves 100
+kifs ranks fetch|annotate|backfill
 ```
 
-KIF は `kif_data/<game_id>.kif` に保存されます。保存できた KIF はその場でパースされ、`kifu_db.json` の対局テーブルへ upsert されます。既に同名 KIF ファイルがある場合は再ダウンロードせず、索引化だけ実行します。
+## 「もれなく」の担保
 
-`crawl_records` にあるが KIF が未取得の対局だけを再試行する場合:
+| 取りこぼし経路 | 対策 |
+| --- | --- |
+| 巡回済みユーザーの新規対局 | フロンティアの全ユーザーが `next_crawl_at` を持ち、`KIFS_USER_RECRAWL_HOURS` (既定24h) 後に再訪対象へ戻る |
+| 対局直後でKIFが未公開 (404) | `attempts` / `next_retry_at` で指数バックオフ再試行。上限到達分も `kif_unavailable` として `kifs status` に残る |
+| 履歴4ページ目以降 | 新規IDが出なくなるまでページを辿る (上限 `KIFS_MAX_HISTORY_PAGES`) |
+| キューあふれ | 切り捨てを廃止。全ユーザーを保持 |
+| プロセス異常終了で未フラッシュ分が消える | .kif は取得直後にディスクへ書かれる。起動時 `reconcile` がディスクを正としてDBを復元 |
+| ファイルだけ消えた対局 | `reconcile` が再取得対象へ戻す |
+| Cookie失効 | 401/403 を検出してログに明示し、リトライ間隔を延ばして待機 |
+
+## 「重複なく」の担保
+
+- `game_id → doc_id` の索引を起動時に構築し、存在判定・更新はすべて **O(1)**。
+- crawl record の作成は `KifuDatabase.add_record()` の1経路のみ。既知IDは `False` を返して何も書かない。
+- 対局ドキュメントの書き込みは `upsert_game()` の1経路のみ。既存フィールド (段位など) は保持してマージ。
+- `data/state/kifs.lock` の `flock` により、同一データディレクトリに対する書き込みプロセスは常に1つ。
+
+## 書き込み性能
+
+v1は1件の更新ごとに198MBのJSONを丸ごと書き直しており、1対局あたり約600MBのシリアライズが発生していました。現在はメモリ上に保持し、`KIFS_FLUSH_EVERY_WRITES` (既定200件) / `KIFS_FLUSH_EVERY_SECONDS` (既定60秒) 、および SIGTERM 受信時にアトミック書き込みします。実測でフラッシュ1回あたり約1秒 (157MB)、収集レートは約1,500対局/時 (`KIFS_REQUEST_DELAY=1.5` のポライトディレイ律速)。
+
+インデントを廃したことでファイルは 190MB → 157MB になりました。
+
+## 作業台へのデプロイ
+
+`docs/operations.md` を参照。要約:
 
 ```bash
-python3 kif_downloader.py --missing
+ssh 172.25.20.20
+git clone git@github.com:LoveKapibarasan/kifs.git ~/kifs
+cd ~/kifs && ./deploy/install.sh
+journalctl --user -u kifs-collector -f
 ```
 
-件数を絞る場合:
+## v1 からの移行
 
 ```bash
-python3 kif_downloader.py --missing --limit 20
+python scripts/migrate_v1_layout.py --dry-run
+python scripts/migrate_v1_layout.py --move
 ```
 
-### 3. KIF を一括で索引化する
+`kif_data/`・`kifu_db.json`・`crawler_state.json`・`user_ranks.json` を新レイアウトへ移し、crawl records に再試行用フィールドを追加し、`crawled_users` を「再訪スケジュール付きのフロンティア」へ変換します (再訪時刻は再訪間隔内に均等に散らし、初日に集中しないようにします)。
 
-既存の `kif_data/*.kif` をまとめて読み直し、まだ DB にない対局を `kifu_db.json` に追加します。
+## テスト
 
 ```bash
-python3 index_to_nosql.py --index
+.venv/bin/python -m pytest -q
 ```
-
-入力ディレクトリや DB パスを変える場合:
-
-```bash
-python3 index_to_nosql.py --index --kif-dir kif_data --db kifu_db.json
-```
-
-### 4. 検索する
-
-対局 ID で検索:
-
-```bash
-python3 index_to_nosql.py --search --game-id "playerA-playerB-20260617_120000"
-```
-
-プレイヤー名で検索:
-
-```bash
-python3 index_to_nosql.py --search --player "playerName" --limit 20
-```
-
-先手、後手、終局理由、最小手数で絞り込み:
-
-```bash
-python3 index_to_nosql.py --search --sente "playerA" --gote "playerB" --result "投了" --min-moves 80
-```
-
-### 5. DB 統計を表示する
-
-```bash
-python3 index_to_nosql.py --stats
-```
-
-総対局数、ユニークプレイヤー数、平均手数、終局理由の分布、対局数上位プレイヤー、`crawl_records` の KIF 取得状態を表示します。
-
-`crawl_records` とローカルの `kif_data/`、索引済み対局テーブルの状態を同期する場合:
-
-```bash
-python3 index_to_nosql.py --sync-crawl-status
-```
-
-## 継続パイプライン
-
-`run_pipeline.py` は、ランキングから初期ユーザーを取得し、対局履歴をたどりながら新しい対局とプレイヤーを探索します。見つけた KIF は保存し、TinyDB に索引化します。
-
-```bash
-python3 run_pipeline.py
-```
-
-動作概要:
-
-- `crawler_state.json` からクロール済みユーザーと待ち行列を復元する
-- 待ち行列が空ならランキングから初期ユーザーを取得する
-- 各ユーザーの `sb` 対局履歴を最大 3 ページ取得する
-- 発見した game_id を `crawl_records` テーブルへ保存する
-- game_id から対局者名を抽出し、未処理ユーザーをキューに追加する
-- 未索引の対局だけ KIF を取得して DB に追加する
-- 5 ユーザーごとに状態を保存する
-- 一時的なエラーでは 60 秒待って再試行する
-
-停止時は `SIGINT` / `SIGTERM` を受けて状態保存を試みます。
-
-## NoSQL データ
-
-`kifu_db.json` は TinyDB のデータファイルです。対局テーブルの各ドキュメントには主に次のフィールドが入ります。
-
-- `game_id`
-- `sente`
-- `gote`
-- `start_time`
-- `end_time`
-- `location`
-- `handicap`
-- `result`
-- `moves`
-- `total_moves`
-- `raw_headers`
-- `crawler_user`
-- `crawler_type`
-- `crawler_ts`
-
-`crawl_records` テーブルには、クロールで発見した未ダウンロードを含む対局 ID が保存されます。
-
-- `game_id`
-- `game_type`
-- `source_user`
-- `discovered_at`
-- `kif_status`: `kif_missing`、`kif_downloaded`、`indexed`
-- `has_kif_file`
-- `is_indexed`
-- `last_attempt_at`
-- `last_error`
-
-`kif_status` の意味:
-
-- `kif_missing`: game_id は取得済みだが、対応する KIF はまだ取得できていない
-- `kif_downloaded`: KIF ファイルはローカルにあるが、対局テーブルへの索引化は未完了
-- `indexed`: KIF 取得と対局テーブルへの索引化が完了済み
-
-## 注意
-
-- 外部サイトへアクセスするため、短時間に大量リクエストを送らないようにしてください。各スクリプトには待機処理がありますが、範囲やページ数を大きくする場合は負荷に注意してください。
-- `.env` の `WEB_SESSION` は認証情報です。公開リポジトリやログに含めないでください。
-- `pipeline.log` や `kifu_db.json` は大きくなりやすいファイルです。運用時は保存先とバックアップ方針を決めてください。
-- game_id の形式は `先手-後手-YYYYMMDD_HHMMSS` を前提にしている箇所があります。プレイヤー名に特殊な文字が含まれる場合は抽出結果を確認してください。

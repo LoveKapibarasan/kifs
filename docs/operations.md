@@ -1,0 +1,99 @@
+# 運用
+
+## 作業台 (172.25.20.20) へのデプロイ
+
+作業台には `~/.env.global` が必要です (Infisical のマシンID)。最低限これだけあれば動きます:
+
+```
+INFISICAL_KIFS_CLIENT_ID=...
+INFISICAL_KIFS_CLIENT_SECRET=...
+INFISICAL_KIFS_ENDPOINT=env.lovekapibarasan.org
+```
+
+```bash
+ssh 172.25.20.20
+git clone git@github.com:LoveKapibarasan/kifs.git ~/kifs
+cd ~/kifs
+./deploy/install.sh
+```
+
+`install.sh` は venv 作成、パッケージ導入、`~/kifs-data/` 作成、認証情報の確認、**user** systemd unit の設置・有効化・起動、`loginctl enable-linger` までを行います。root は不要です。
+
+既存データを持ち込む場合は、install の前に転送します:
+
+```bash
+rsync -a --info=progress2 ~/kifs/data/kif/     172.25.20.20:~/kifs-data/kif/
+rsync -a                  ~/kifs/data/kifu_db.json 172.25.20.20:~/kifs-data/
+rsync -a                  ~/kifs/data/state/   172.25.20.20:~/kifs-data/state/
+```
+
+## 日常操作
+
+```bash
+systemctl --user status kifs-collector      # 稼働確認
+journalctl --user -u kifs-collector -f      # ログ追尾
+systemctl --user restart kifs-collector
+systemctl --user stop kifs-collector        # SIGTERM → 状態を確定保存して停止
+KIFS_DATA_DIR=~/kifs-data ~/kifs/.venv/bin/kifs status
+```
+
+`kifs status` はサービス稼働中でも実行できます (ロックを取りません)。
+
+## 見るべき指標
+
+```json
+{
+  "games_indexed": 38194,          // 収集済み対局
+  "records_by_status": {
+    "indexed": 38194,
+    "kif_missing": 8               // 再試行待ち。増え続けるなら要調査
+  },
+  "records_due_now": 8,            // 今すぐ再試行できる件数
+  "records_given_up": 0,           // 上限まで再試行しても取れなかった件数
+  "users_never_crawled": 20034,    // 未巡回。0に近づいたら再訪モードに入る
+  "users_due": 20150               // 巡回対象の総数
+}
+```
+
+- `records_given_up` が増える → KIFが恒久的に非公開の対局か、`ANALYTICS_SESSION` の失効。
+- `users_never_crawled` が0で `users_due` も小さい → ランキング再シードが効いているか確認。
+- `db_size_mb` の伸びが止まった → フラッシュされているかログで確認。
+
+## Cookie が失効したとき
+
+ログに以下が出ます:
+
+```
+Session cookie rejected (ranking returned 403). Credentials came from 'infisical'.
+Refresh WEB_SESSION in Infisical, then restart.
+```
+
+サービスは終了せず、間隔を空けて再試行し続けます。更新手順:
+
+```bash
+# ブラウザから新しい Cookie を取得し、環境変数に入れてから
+export WEB_SESSION='...'
+export ANALYTICS_SESSION='...'
+kifs secrets push
+systemctl --user restart kifs-collector
+```
+
+`kifs secrets check` で反映を確認できます。
+
+## 収集ペースの調整
+
+既定は1リクエストあたり1.5秒のポライトディレイで、約1,500対局/時です。
+
+```bash
+systemctl --user edit kifs-collector
+# [Service]
+# Environment=KIFS_REQUEST_DELAY=1.0
+# Environment=KIFS_USER_RECRAWL_HOURS=12
+# Environment=KIFS_GAME_TYPES=sb,s1
+```
+
+`KIFS_GAME_TYPES` を増やすと収集対象の持ち時間が増えますが、1ユーザーあたりのリクエスト数もその分増えます。
+
+## バックアップ
+
+失って困るのは `~/kifs-data/` だけです。`kif/` があれば `kifs reconcile` でDBは再構築できるため、優先度は `kif/` > `state/` > `kifu_db.json` の順です。
