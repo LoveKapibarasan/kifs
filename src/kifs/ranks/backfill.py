@@ -24,9 +24,10 @@ USER_AGENT = "Mozilla/5.0 (X11; Ubuntu; Linux x86_64) AppleWebKit/537.36 (KHTML,
 
 async def backfill_ranks(db: KifuDatabase, settings: Settings,
                          limit: Optional[int] = None) -> dict:
+    # One query rather than streaming every document through Python.
     todo = [
-        game["game_id"] for game in db.games()
-        if game.get("game_id") and not game.get("sente_rank") and not game.get("gote_rank")
+        row["game_id"] for row in db.connection.execute(
+            "SELECT game_id FROM games WHERE sente_rank IS NULL AND gote_rank IS NULL")
     ]
     if limit:
         todo = todo[:limit]

@@ -66,7 +66,9 @@ class Settings:
     kif_dir: Path
     db_path: Path
     state_dir: Path
-    frontier_path: Path
+    #: Legacy v2 paths, kept so `kifs migrate-sqlite` can find the old data.
+    legacy_db_path: Path
+    legacy_frontier_path: Path
     log_dir: Path
     lock_path: Path
 
@@ -150,9 +152,10 @@ def load_settings() -> Settings:
     settings = Settings(
         data_dir=data_dir,
         kif_dir=Path(os.getenv("KIFS_KIF_DIR", data_dir / "kif")).expanduser(),
-        db_path=Path(os.getenv("KIFS_DB_PATH", data_dir / "kifu_db.json")).expanduser(),
+        db_path=Path(os.getenv("KIFS_DB_PATH", data_dir / "kifs.sqlite3")).expanduser(),
         state_dir=data_dir / "state",
-        frontier_path=data_dir / "state" / "frontier.json",
+        legacy_db_path=data_dir / "kifu_db.json",
+        legacy_frontier_path=data_dir / "state" / "frontier.json",
         log_dir=Path(os.getenv("KIFS_LOG_DIR", data_dir / "logs")).expanduser(),
         lock_path=data_dir / "state" / "kifs.lock",
     )

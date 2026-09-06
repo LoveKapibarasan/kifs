@@ -70,33 +70,44 @@ def reconcile(db: KifuDatabase, settings: Settings) -> dict:
         on_disk[path.stem] = path
     counts["scanned"] = len(on_disk)
 
+    # Read the two id sets once instead of doing a point query per file; at
+    # 75k games that is two scans rather than 150k lookups.
+    known_games = set(db.game_ids())
+    known_records = {
+        row["game_id"]: row["kif_status"]
+        for row in db.connection.execute("SELECT game_id, kif_status FROM crawl_records")
+    }
+
     for game_id, path in on_disk.items():
-        if not db.has_record(game_id):
+        if game_id not in known_records:
             db.add_record(game_id, settings.game_types[0], None)
             counts["records_created"] += 1
-        if not db.has_game(game_id):
+        if game_id not in known_games:
             if index_kif_file(db, game_id, path):
                 counts["indexed_from_disk"] += 1
-        else:
-            record = db.get_record(game_id)
-            if record is None or record.status != STATUS_INDEXED:
-                db.mark_indexed(game_id)
+        elif known_records.get(game_id) != STATUS_INDEXED:
+            db.mark_indexed(game_id)
 
-    for record in list(db.records()):
-        game_id = record.game_id
-        if game_id in on_disk:
-            continue
-        if record.get("has_kif_file") or record.status in (STATUS_INDEXED, STATUS_KIF_DOWNLOADED):
-            # The file vanished; make the downloader pick it up again.
-            db.update_record(
-                game_id,
-                kif_status=STATUS_KIF_MISSING,
-                has_kif_file=False,
-                is_indexed=False,
-                next_retry_at=None,
-                last_error="KIF file missing on disk",
-            )
-            counts["files_missing"] += 1
+    # Records claiming a file that is no longer there. Collect the ids first:
+    # updating a table while a cursor is open on it is not safe.
+    orphaned = [
+        row["game_id"] for row in db.connection.execute(
+            "SELECT game_id FROM crawl_records "
+            "WHERE has_kif_file = 1 OR kif_status IN (?, ?)",
+            (STATUS_INDEXED, STATUS_KIF_DOWNLOADED))
+        if row["game_id"] not in on_disk
+    ]
+    for game_id in orphaned:
+        # The file vanished; make the downloader pick it up again.
+        db.update_record(
+            game_id,
+            kif_status=STATUS_KIF_MISSING,
+            has_kif_file=False,
+            is_indexed=False,
+            next_retry_at=None,
+            last_error="KIF file missing on disk",
+        )
+        counts["files_missing"] += 1
 
     log.info(
         "Reconcile: scanned %d files, indexed %d from disk, created %d records, "

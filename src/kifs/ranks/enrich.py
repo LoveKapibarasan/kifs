@@ -93,24 +93,28 @@ def annotate_games(db: KifuDatabase, settings: Settings) -> int:
         return 0
 
     annotated = 0
+    # Collect first, then write: mutating while iterating a live cursor is not
+    # safe, and this way the writes go out in batched transactions.
+    updates = []
     for game in db.games():
         game_id = game.get("game_id")
         if not game_id:
             continue
-        changed = False
+        patch = {"game_id": game_id}
         for side in ("sente", "gote"):
             info = ranks.get(game.get(side)) or {}
             if info.get("rating_3m") is not None and game.get(f"{side}_rating") is None:
-                game[f"{side}_rating"] = info["rating_3m"]
-                changed = True
+                patch[f"{side}_rating"] = info["rating_3m"]
             # Never overwrite the rank the KIF recorded at game time.
             if not game.get(f"{side}_rank") and info.get("rank_3m"):
-                game[f"{side}_rank"] = info["rank_3m"]
-                game[f"{side}_rank_is_current"] = True
-                changed = True
-        if changed:
-            annotated += 1
+                patch[f"{side}_rank"] = info["rank_3m"]
+                patch[f"{side}_rank_is_current"] = True
+        if len(patch) > 1:
+            updates.append(patch)
 
+    for patch in updates:
+        db.upsert_game(patch)
+        annotated += 1
     if annotated:
         db.flush(force=True)
     log.info("Annotated %d games with cached ranks.", annotated)

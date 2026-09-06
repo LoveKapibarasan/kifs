@@ -51,8 +51,7 @@ def _save_snapshot(settings: Settings, snapshot: dict) -> None:
 def build_report(settings: Settings, persist: bool = True) -> dict:
     """Gather the numbers for one report, and record them as the new baseline."""
     db = KifuDatabase(settings.db_path).open()
-    frontier = Frontier(settings.frontier_path,
-                        recrawl_hours=settings.user_recrawl_hours).load()
+    frontier = Frontier(db, recrawl_hours=settings.user_recrawl_hours)
     try:
         counts = db.status_counts()
         now = datetime.now(timezone.utc)
@@ -61,8 +60,7 @@ def build_report(settings: Settings, persist: bool = True) -> dict:
             "games_indexed": db.count_games(),
             "crawl_records": db.count_records(),
             "users_known": len(frontier),
-            "db_size_mb": round(settings.db_path.stat().st_size / 1e6, 1)
-            if settings.db_path.is_file() else 0.0,
+            "db_size_mb": round(db.size_bytes() / 1e6, 1),
         }
 
         previous = _load_snapshot(settings)

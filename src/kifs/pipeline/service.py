@@ -75,11 +75,7 @@ class CollectorService:
             flush_every_writes=settings.flush_every_writes,
             flush_every_seconds=settings.flush_every_seconds,
         )
-        self.frontier = Frontier(
-            settings.frontier_path,
-            recrawl_hours=settings.user_recrawl_hours,
-            flush_every_seconds=settings.flush_every_seconds,
-        )
+        self.frontier = Frontier(self.db, recrawl_hours=settings.user_recrawl_hours)
         self.alerter = Alerter(settings)
         self._consecutive_failures = 0
 
@@ -185,12 +181,12 @@ class CollectorService:
         if not self.running:
             return
 
-        user_id = self.frontier.next_user()
+        user_id = self.frontier.claim_user()
         if user_id is None:
             # Nothing due: top up from the ranking rather than exiting (issue #2).
             log.info("Frontier has nothing due; re-seeding from the ranking.")
             await discovery.seed_from_rankings()
-            if self.frontier.next_user() is None:
+            if self.frontier.peek_user() is None:
                 log.info("Still nothing due; sleeping 60s before looking again.")
                 await self._sleep(60.0)
             return
