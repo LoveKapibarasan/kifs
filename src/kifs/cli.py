@@ -262,8 +262,17 @@ def cmd_secrets(args, settings: Settings) -> int:
         resolve_credentials(settings, use_infisical=not args.no_infisical)
         print(f"source: {settings.credential_source}")
         for key, value in (("WEB_SESSION", settings.web_session),
-                           ("ANALYTICS_SESSION", settings.analytics_session)):
+                           ("ANALYTICS_SESSION", settings.analytics_session),
+                           ("SMTP_PASSWORD", settings.smtp_password)):
             print(f"  {key}: {'set (%d chars)' % len(value) if value else 'MISSING'}")
+        # These are addresses and hostnames, not secrets; showing them is what
+        # makes a misdirected report easy to spot.
+        for key, value in (("SMTP_SERVER", settings.smtp_server),
+                           ("SMTP_PORT", settings.smtp_port),
+                           ("SMTP_FROM", settings.smtp_from),
+                           ("REPORT_TO", settings.report_to)):
+            print(f"  {key}: {value if value else 'MISSING'}")
+        print(f"  mail configured: {settings.mail_configured}")
         return 0 if settings.web_session else 2
 
     if args.secret_action == "push":

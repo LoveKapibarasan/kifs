@@ -139,3 +139,19 @@ def test_mail_configured_requires_every_field(mail_settings):
     assert Mailer(mail_settings).configured is True
     mail_settings.report_to = None
     assert Mailer(mail_settings).configured is False
+
+
+def test_retry_numbers_are_reported_separately(settings):
+    """due_records() is not a subset of kif_missing, so the report must not
+    present it as 'of which' — that produced a larger subset than its total."""
+    db = KifuDatabase(settings.db_path, flush_every_writes=10_000).open()
+    db.add_record("downloaded-but-unindexed-1", "sb", "u")
+    db.mark_downloaded("downloaded-but-unindexed-1")
+    db.add_record("never-downloaded-1", "sb", "u")
+    db.close()
+
+    report = build_report(settings)
+    assert report["retry_backlog"] == 1          # only the kif_missing one
+    assert report["records_due_now"] == 2        # both are due
+    text = render_text(report)
+    assert "うち" not in text

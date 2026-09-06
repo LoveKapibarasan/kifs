@@ -84,6 +84,9 @@ def build_report(settings: Settings, persist: bool = True) -> dict:
             "games_per_hour": round(delta["games_indexed"] / hours, 1)
             if delta.get("games_indexed") is not None and hours else None,
             "records_by_status": counts,
+            # due_records() also covers records that were downloaded but never
+            # indexed, so it is not a subset of kif_missing — report it as its
+            # own number rather than "of which".
             "records_due_now": len(db.due_records()),
             "records_given_up": counts.get(STATUS_KIF_UNAVAILABLE, 0),
             "retry_backlog": counts.get(STATUS_KIF_MISSING, 0),
@@ -139,7 +142,8 @@ def render_text(report: dict) -> str:
     lines += [
         "",
         "■ 未処理",
-        f"  再試行待ち     : {report['retry_backlog']:,}  (うち今すぐ再試行可能 {report['records_due_now']:,})",
+        f"  KIF未取得      : {report['retry_backlog']:,}",
+        f"  再試行可能     : {report['records_due_now']:,}",
         f"  取得断念       : {report['records_given_up']:,}",
         f"  未巡回ユーザー : {report['users_never_crawled']:,}",
         f"  巡回対象       : {report['users_due']:,}",
@@ -205,8 +209,8 @@ def render_html(report: dict) -> str:
   <h2 style="margin:20px 0 8px;font-size:14px;color:#1f2328;">未処理</h2>
   <table style="width:100%;border-collapse:collapse;font-size:14px;
    border:1px solid #d0d7de;border-radius:6px;">
-    {row("再試行待ち", f"{report['retry_backlog']:,}")}
-    {row("うち今すぐ再試行可", f"{report['records_due_now']:,}")}
+    {row("KIF未取得", f"{report['retry_backlog']:,}")}
+    {row("再試行可能", f"{report['records_due_now']:,}")}
     {row("取得断念", f"{report['records_given_up']:,}")}
     {row("未巡回ユーザー", f"{report['users_never_crawled']:,}")}
     {row("巡回対象", f"{report['users_due']:,}")}
