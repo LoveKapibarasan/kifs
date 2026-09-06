@@ -1,0 +1,22 @@
+[Unit]
+Description=Shogi Wars KIF collector - daily report
+Documentation=https://github.com/LoveKapibarasan/kifs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/kifs
+Environment=KIFS_DATA_DIR=%h/kifs-data
+Environment=PYTHONUNBUFFERED=1
+ExecStart=%h/kifs/.venv/bin/kifs --no-log-file report --send
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/kifs-data
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kifs-report

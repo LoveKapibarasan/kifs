@@ -72,8 +72,24 @@ kifs reconcile                   # ディスク上の .kif とDBを突き合わ�
 kifs status                      # 収集状況をJSONで出力
 kifs stats                       # データセットの統計
 kifs search --player takachang2 --min-moves 100
+kifs report                      # 日次レポートをプレビュー
+kifs report --send               # メール送信 (systemd timer が実行するもの)
 kifs ranks fetch|annotate|backfill
 ```
+
+## 通知
+
+日次レポートを毎日 **08:00 JST** (23:00 UTC) にメール送信します。加えて、以下を検知したときは即時メールを送ります。
+
+| 条件 | 内容 |
+| --- | --- |
+| `cookie_expired` | ランキング/履歴が401・403を返した (Cookie失効) |
+| `collection_stalled` | サービスは稼働中なのに `KIFS_STALL_MINUTES` (既定90分) 索引化が0件 |
+| `cycle_failing` | 収集サイクルが5回連続で失敗 |
+
+同じ条件は `KIFS_ALERT_COOLDOWN_HOURS` (既定6時間) 以内に再送しません。状態は `data/state/alerts.json` に持つため、再起動ループで大量送信することはありません。条件が解消すると (対局が索引化されると) キーがクリアされ、次回の発生で即座に通知します。メール送信の失敗が収集を止めることはありません。
+
+SMTP設定 (`SMTP_SERVER` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` / `REPORT_TO`) はセッションCookieと同じく Infisical の Kifs プロジェクトから取得します。
 
 ## 「もれなく」の担保
 

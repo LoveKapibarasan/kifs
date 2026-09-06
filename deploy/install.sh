@@ -12,6 +12,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DATA_DIR="${KIFS_DATA_DIR:-$HOME/kifs-data}"
 UNIT_DIR="$HOME/.config/systemd/user"
 UNIT_NAME="kifs-collector.service"
+REPORT_UNITS=("kifs-report.service" "kifs-report.timer")
 START=1
 
 for arg in "$@"; do
@@ -41,13 +42,19 @@ echo "[*] verifying credentials"
 KIFS_DATA_DIR="$DATA_DIR" "$REPO_DIR/.venv/bin/kifs" --no-log-file secrets check
 
 mkdir -p "$UNIT_DIR"
-sed -e "s|%h/kifs\b|$REPO_DIR|g" \
-    -e "s|%h/kifs-data|$DATA_DIR|g" \
-    -e "s|^User=%i$||" \
-    "$REPO_DIR/deploy/kifs-collector.service" > "$UNIT_DIR/$UNIT_NAME"
+install_unit() {
+  sed -e "s|%h/kifs\b|$REPO_DIR|g" \
+      -e "s|%h/kifs-data|$DATA_DIR|g" \
+      -e "s|^User=%i$||" \
+      "$REPO_DIR/deploy/$1" > "$UNIT_DIR/$1"
+}
+install_unit "$UNIT_NAME"
+for unit in "${REPORT_UNITS[@]}"; do install_unit "$unit"; done
 
 systemctl --user daemon-reload
 systemctl --user enable "$UNIT_NAME"
+# The daily report is a timer; enabling the .service itself would run it at boot.
+systemctl --user enable --now kifs-report.timer
 
 # Keep the service alive across logout/reboot without an interactive session.
 loginctl enable-linger "$USER" 2>/dev/null || \
@@ -65,4 +72,7 @@ cat <<MSG
     logs   : journalctl --user -u $UNIT_NAME -f
     status : KIFS_DATA_DIR=$DATA_DIR $REPO_DIR/.venv/bin/kifs status
     stop   : systemctl --user stop $UNIT_NAME
+    report : systemctl --user list-timers kifs-report.timer
+             KIFS_DATA_DIR=$DATA_DIR $REPO_DIR/.venv/bin/kifs report          # preview
+             KIFS_DATA_DIR=$DATA_DIR $REPO_DIR/.venv/bin/kifs report --send   # send now
 MSG
