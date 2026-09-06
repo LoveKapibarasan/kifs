@@ -173,8 +173,8 @@ def main() -> int:
     print(f"[*] target: {settings.data_dir}")
 
     migrate_kif_dir(source / "kif_data", settings.kif_dir, args.dry_run, args.move)
-    migrate_db(source / "kifu_db.json", settings.db_path, args.dry_run)
-    migrate_state(source / "crawler_state.json", settings.frontier_path,
+    migrate_db(source / "kifu_db.json", settings.legacy_db_path, args.dry_run)
+    migrate_state(source / "crawler_state.json", settings.legacy_frontier_path,
                   args.dry_run, settings.user_recrawl_hours)
 
     migrate_derived(source, settings.data_dir, args.dry_run, args.move)
@@ -190,7 +190,9 @@ def main() -> int:
     if args.dry_run:
         print("\n[dry-run] nothing was written.")
     else:
-        print("\n[+] migration complete. Verify with: kifs status")
+        print("\n[+] layout migration complete.")
+        print("    Now import the JSON into SQLite:  kifs migrate-sqlite")
+        print("    Then verify:                      kifs status")
     return 0
 
 

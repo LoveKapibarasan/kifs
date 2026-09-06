@@ -8,6 +8,8 @@
     kifs stats          dataset and crawl-status summary
     kifs status         operational snapshot (what the service has left to do)
     kifs report         build the daily report; --send mails it
+    kifs export         write kifu_db.json (TinyDB format) from the database
+    kifs migrate-sqlite import a v2 kifu_db.json + frontier.json into SQLite
     kifs ranks fetch|annotate|backfill
     kifs secrets check|push
 """
@@ -18,6 +20,7 @@ import asyncio
 import json
 import logging
 import sys
+from pathlib import Path
 from typing import List, Optional
 
 from kifs.config import Settings, load_settings, resolve_credentials
@@ -173,8 +176,7 @@ def cmd_status(args, settings: Settings) -> int:
     from kifs.storage.frontier import Frontier
 
     db = _open_db(settings)
-    frontier = Frontier(settings.frontier_path,
-                        recrawl_hours=settings.user_recrawl_hours).load()
+    frontier = Frontier(db, recrawl_hours=settings.user_recrawl_hours)
     counts = db.status_counts()
     due = len(db.due_records())
     kif_files = sum(1 for _ in settings.kif_dir.glob("*.kif"))
@@ -182,8 +184,7 @@ def cmd_status(args, settings: Settings) -> int:
     report = {
         "data_dir": str(settings.data_dir),
         "db_path": str(settings.db_path),
-        "db_size_mb": round(settings.db_path.stat().st_size / 1e6, 1)
-        if settings.db_path.is_file() else 0.0,
+        "db_size_mb": round(db.size_bytes() / 1e6, 1),
         "kif_files_on_disk": kif_files,
         "games_indexed": db.count_games(),
         "crawl_records": db.count_records(),
@@ -194,6 +195,33 @@ def cmd_status(args, settings: Settings) -> int:
     }
     print(json.dumps(report, indent=2, ensure_ascii=False))
     db.close()
+    return 0
+
+
+def cmd_export(args, settings: Settings) -> int:
+    from kifs.storage.export import export_tinydb_json
+
+    db = _open_db(settings)
+    try:
+        target = args.output or (settings.data_dir / "kifu_db.json")
+        counts = export_tinydb_json(db, Path(target), include_records=not args.games_only,
+                                    indent=args.indent)
+        print(json.dumps(counts, indent=2))
+    finally:
+        db.close()
+    return 0
+
+
+def cmd_migrate_sqlite(args, settings: Settings) -> int:
+    from kifs.storage.migrate import migrate_json_to_sqlite
+
+    counts = migrate_json_to_sqlite(
+        settings,
+        json_path=args.json or settings.legacy_db_path,
+        frontier_path=args.frontier or settings.legacy_frontier_path,
+        dry_run=args.dry_run,
+    )
+    print(json.dumps(counts, indent=2))
     return 0
 
 
@@ -347,6 +375,20 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--to", default=None, help="Override the recipient.")
     report.add_argument("--json", action="store_true", help="Print the raw numbers.")
     report.set_defaults(func=cmd_report)
+
+    export = sub.add_parser("export", help="Write the TinyDB-format kifu_db.json.")
+    export.add_argument("--output", "-o", default=None, help="Target path.")
+    export.add_argument("--games-only", action="store_true",
+                        help="Omit the crawl_records table.")
+    export.add_argument("--indent", action="store_true", help="Pretty-print (much larger).")
+    export.set_defaults(func=cmd_export)
+
+    migrate = sub.add_parser("migrate-sqlite",
+                             help="Import a v2 kifu_db.json + frontier.json into SQLite.")
+    migrate.add_argument("--json", default=None, help="Source kifu_db.json.")
+    migrate.add_argument("--frontier", default=None, help="Source frontier.json.")
+    migrate.add_argument("--dry-run", action="store_true", help="Report without writing.")
+    migrate.set_defaults(func=cmd_migrate_sqlite)
 
     ranks = sub.add_parser("ranks", help="Player rank enrichment.")
     ranks.add_argument("rank_action", choices=["fetch", "annotate", "backfill"])

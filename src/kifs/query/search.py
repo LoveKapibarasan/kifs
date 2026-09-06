@@ -15,57 +15,70 @@ def search_games(db: KifuDatabase, game_id: Optional[str] = None,
         found = db.get_game(game_id)
         return [found] if found else []
 
-    def matches(game: dict) -> bool:
-        if player:
-            needle = player.lower()
-            names = (game.get("sente") or "", game.get("gote") or "")
-            if not any(needle in name.lower() for name in names):
-                return False
-        if sente and sente.lower() not in (game.get("sente") or "").lower():
-            return False
-        if gote and gote.lower() not in (game.get("gote") or "").lower():
-            return False
-        if result and game.get("result") != result:
-            return False
-        if min_moves is not None and game.get("total_moves", 0) < min_moves:
-            return False
-        return True
+    clauses: List[str] = []
+    params: List = []
+    if player:
+        clauses.append("(sente LIKE ? OR gote LIKE ?)")
+        params += [f"%{player}%", f"%{player}%"]
+    if sente:
+        clauses.append("sente LIKE ?")
+        params.append(f"%{sente}%")
+    if gote:
+        clauses.append("gote LIKE ?")
+        params.append(f"%{gote}%")
+    if result:
+        clauses.append("result = ?")
+        params.append(result)
+    if min_moves is not None:
+        clauses.append("total_moves >= ?")
+        params.append(min_moves)
 
-    hits: List[dict] = []
-    for game in db.games():
-        if matches(game):
-            hits.append(game)
-            if len(hits) >= limit:
-                break
-    return hits
+    query = "SELECT * FROM games"
+    if clauses:
+        query += " WHERE " + " AND ".join(clauses)
+    query += " LIMIT ?"
+    params.append(limit)
+
+    from kifs.storage.database import _row_to_game
+
+    return [_row_to_game(row) for row in db.connection.execute(query, params)]
 
 
 def summarize(db: KifuDatabase) -> Dict:
-    """Aggregate counts for ``kifs stats``."""
-    total = 0
-    total_moves = 0
-    players: Dict[str, int] = {}
-    results: Dict[str, int] = {}
-    with_rank = 0
+    """Aggregate counts for ``kifs stats``.
 
-    for game in db.games():
-        total += 1
-        total_moves += game.get("total_moves", 0)
-        for name in (game.get("sente"), game.get("gote")):
-            if name:
-                players[name] = players.get(name, 0) + 1
-        outcome = game.get("result")
-        if outcome:
-            results[outcome] = results.get(outcome, 0) + 1
-        if game.get("sente_rank") or game.get("gote_rank"):
-            with_rank += 1
+    Aggregation happens in SQLite; the previous version streamed every document
+    into Python to count them.
+    """
+    connection = db.connection
+    totals = connection.execute(
+        "SELECT COUNT(*) AS n, COALESCE(SUM(total_moves), 0) AS moves, "
+        "       SUM(CASE WHEN sente_rank IS NOT NULL OR gote_rank IS NOT NULL "
+        "                THEN 1 ELSE 0 END) AS with_rank "
+        "FROM games").fetchone()
+    total = totals["n"]
+
+    results = {row["result"]: row["n"] for row in connection.execute(
+        "SELECT result, COUNT(*) AS n FROM games WHERE result IS NOT NULL "
+        "GROUP BY result ORDER BY n DESC")}
+
+    unique_players = connection.execute(
+        "SELECT COUNT(*) AS n FROM ("
+        "  SELECT sente AS name FROM games WHERE sente IS NOT NULL "
+        "  UNION SELECT gote FROM games WHERE gote IS NOT NULL)").fetchone()["n"]
+
+    top_players = [(row["name"], row["n"]) for row in connection.execute(
+        "SELECT name, COUNT(*) AS n FROM ("
+        "  SELECT sente AS name FROM games WHERE sente IS NOT NULL "
+        "  UNION ALL SELECT gote FROM games WHERE gote IS NOT NULL) "
+        "GROUP BY name ORDER BY n DESC LIMIT 5")]
 
     return {
         "total_games": total,
-        "unique_players": len(players),
-        "average_moves": (total_moves / total) if total else 0.0,
-        "games_with_rank": with_rank,
-        "results": dict(sorted(results.items(), key=lambda kv: kv[1], reverse=True)),
-        "top_players": sorted(players.items(), key=lambda kv: kv[1], reverse=True)[:5],
+        "unique_players": unique_players,
+        "average_moves": (totals["moves"] / total) if total else 0.0,
+        "games_with_rank": totals["with_rank"] or 0,
+        "results": results,
+        "top_players": top_players,
         "crawl_status": db.status_counts(),
     }

@@ -128,4 +128,22 @@ systemctl --user edit kifs-report.timer
 
 ## バックアップ
 
-失って困るのは `~/kifs-data/` だけです。`kif/` があれば `kifs reconcile` でDBは再構築できるため、優先度は `kif/` > `state/` > `kifu_db.json` の順です。
+失って困るのは `~/kifs-data/` だけです。`kif/` があれば `kifs reconcile` でDBは再構築できるため、優先度は `kif/` > `kifs.sqlite3` > `state/` の順です。
+
+SQLite のバックアップはコピーではなく、稼働中でも安全な以下を使います。
+
+```bash
+sqlite3 ~/kifs-data/kifs.sqlite3 ".backup ~/kifs-backup.sqlite3"
+```
+
+## SQLite への移行 (v2 → v3)
+
+```bash
+systemctl --user stop kifs-collector
+kifs migrate-sqlite --dry-run     # 件数の確認
+kifs migrate-sqlite               # 取り込み (38k対局で約26秒)
+kifs status                       # 件数が一致するか確認
+systemctl --user start kifs-collector
+```
+
+元の `kifu_db.json` と `state/frontier.json` は削除されません。切り戻す場合は旧コードに戻すだけで、そのまま読めます。

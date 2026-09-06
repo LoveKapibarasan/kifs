@@ -14,9 +14,10 @@ def settings(tmp_path) -> Settings:
     settings = Settings(
         data_dir=data_dir,
         kif_dir=data_dir / "kif",
-        db_path=data_dir / "kifu_db.json",
+        db_path=data_dir / "kifs.sqlite3",
         state_dir=data_dir / "state",
-        frontier_path=data_dir / "state" / "frontier.json",
+        legacy_db_path=data_dir / "kifu_db.json",
+        legacy_frontier_path=data_dir / "state" / "frontier.json",
         log_dir=data_dir / "logs",
         lock_path=data_dir / "state" / "kifs.lock",
     )

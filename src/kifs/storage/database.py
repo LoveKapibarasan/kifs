@@ -1,22 +1,28 @@
-"""The game database and the crawl-record state machine.
+"""The game database and the crawl-record state machine, on SQLite (issue #9).
 
-Every ``game_id`` lookup goes through an in-memory ``game_id -> doc_id`` index,
-so membership tests and updates are O(1). The old pipeline used TinyDB's
-``contains``/``update``, each a full scan of 38k records, several times per
-collected game (issue #4).
+The public surface is unchanged from the JSON-backed version, so the pipeline,
+the query layer and the reports did not have to change. What changed is that
+nothing is loaded up front: ``has_game`` is an indexed point lookup and
+``due_records`` is an indexed range scan, both independent of dataset size.
+
+Writes are batched into a transaction that commits every
+``flush_every_writes`` / ``flush_every_seconds`` and on ``close()``, so the
+collector does not pay an fsync per game.
 """
 from __future__ import annotations
 
+import json
 import logging
+import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Iterable, Iterator, List, Optional
 
-from kifs.storage.jsonstore import BufferedJSONStore
+from kifs.storage.sqlite import Transaction, connect
 
 log = logging.getLogger(__name__)
 
-GAMES_TABLE = "_default"
+GAMES_TABLE = "games"
 CRAWL_RECORDS_TABLE = "crawl_records"
 
 #: Discovered, KIF not on disk yet — the retry scheduler owns these.
@@ -28,7 +34,23 @@ STATUS_INDEXED = "indexed"
 #: Retried up to the attempt limit without success; kept for visibility.
 STATUS_KIF_UNAVAILABLE = "kif_unavailable"
 
-ACTIVE_STATUSES = (STATUS_KIF_MISSING, STATUS_KIF_DOWNLOADED)
+#: Statuses the retry scheduler will never pick up again.
+TERMINAL_STATUSES = (STATUS_INDEXED, STATUS_KIF_UNAVAILABLE)
+
+#: Columns of ``games`` that are stored as their own column rather than in extra.
+GAME_COLUMNS = (
+    "game_id", "sente", "gote", "sente_rank", "gote_rank", "sente_rating",
+    "gote_rating", "start_time", "end_time", "location", "handicap", "result",
+    "total_moves", "moves", "raw_headers", "crawler_user", "crawler_type",
+    "crawler_ts",
+)
+_JSON_COLUMNS = ("moves", "raw_headers")
+
+RECORD_COLUMNS = (
+    "game_id", "game_type", "source_user", "discovered_at", "kif_status",
+    "has_kif_file", "is_indexed", "indexed_at", "attempts", "next_retry_at",
+    "last_attempt_at", "last_error",
+)
 
 
 def utcnow() -> datetime:
@@ -69,7 +91,7 @@ class CrawlRecord(dict):
 
     def is_due(self, now: Optional[datetime] = None) -> bool:
         """True when this game should be (re)attempted right now."""
-        if self.status in (STATUS_INDEXED, STATUS_KIF_UNAVAILABLE):
+        if self.status in TERMINAL_STATUSES:
             return False
         next_retry = parse_iso(self.get("next_retry_at"))
         if next_retry is None:
@@ -77,41 +99,82 @@ class CrawlRecord(dict):
         return next_retry <= (now or utcnow())
 
 
+def _row_to_game(row: sqlite3.Row) -> dict:
+    game = {key: row[key] for key in row.keys() if key != "extra"}
+    for column in _JSON_COLUMNS:
+        if game.get(column):
+            try:
+                game[column] = json.loads(game[column])
+            except (TypeError, ValueError):
+                game[column] = [] if column == "moves" else {}
+        else:
+            game[column] = [] if column == "moves" else {}
+    if row["extra"]:
+        try:
+            game.update(json.loads(row["extra"]))
+        except ValueError:
+            pass
+    return game
+
+
+def _row_to_record(row: sqlite3.Row) -> CrawlRecord:
+    record = CrawlRecord({key: row[key] for key in row.keys()})
+    record["has_kif_file"] = bool(record.get("has_kif_file"))
+    record["is_indexed"] = bool(record.get("is_indexed"))
+    return record
+
+
 class KifuDatabase:
-    """Facade over ``kifu_db.json``: games plus their crawl state."""
+    """Facade over the collection database: games plus their crawl state."""
 
     def __init__(self, path: Path, flush_every_writes: int = 200,
-                 flush_every_seconds: float = 60.0):
-        self._store = BufferedJSONStore(path, flush_every_writes, flush_every_seconds)
-        self._game_index: Dict[str, str] = {}
-        self._record_index: Dict[str, str] = {}
-        self._loaded = False
+                 flush_every_seconds: float = 60.0, read_only: bool = False):
+        self.path = Path(path)
+        self.flush_every_writes = flush_every_writes
+        self.flush_every_seconds = flush_every_seconds
+        self._read_only = read_only
+        self._connection: Optional[sqlite3.Connection] = None
+        self._transaction: Optional[Transaction] = None
 
     # -- lifecycle ----------------------------------------------------
     def open(self) -> "KifuDatabase":
-        if self._loaded:
-            return self
-        self._store.load()
-        for doc_id, doc in self._store.table(GAMES_TABLE).items():
-            game_id = doc.get("game_id")
-            if game_id:
-                self._game_index[game_id] = doc_id
-        for doc_id, doc in self._store.table(CRAWL_RECORDS_TABLE).items():
-            game_id = doc.get("game_id")
-            if game_id:
-                self._record_index[game_id] = doc_id
-        log.info(
-            "Indexed %d games and %d crawl records for O(1) lookup.",
-            len(self._game_index), len(self._record_index),
-        )
-        self._loaded = True
+        if self._connection is None:
+            self._connection = connect(self.path, read_only=self._read_only)
+            self._transaction = Transaction(
+                self._connection, self.flush_every_writes, self.flush_every_seconds)
+            log.info("Opened %s (%d games, %d crawl records).", self.path.name,
+                     self.count_games(), self.count_records())
         return self
 
+    @property
+    def transaction(self) -> Transaction:
+        if self._transaction is None:
+            self.open()
+        return self._transaction  # type: ignore[return-value]
+
+    @property
+    def connection(self) -> sqlite3.Connection:
+        if self._connection is None:
+            self.open()
+        return self._connection  # type: ignore[return-value]
+
+    def _begin(self) -> None:
+        self.transaction.begin()
+
+    def _mark_dirty(self, count: int = 1) -> None:
+        self.transaction.mark(count)
+
     def flush(self, force: bool = False) -> bool:
-        return self._store.flush(force=force)
+        """Commit the open transaction. Returns True if anything was committed."""
+        return self.transaction.commit(force=force)
 
     def close(self) -> None:
-        self._store.close()
+        if self._connection is None:
+            return
+        self.flush(force=True)
+        self._connection.close()
+        self._connection = None
+        self._transaction = None
 
     def __enter__(self) -> "KifuDatabase":
         return self.open()
@@ -121,86 +184,134 @@ class KifuDatabase:
 
     @property
     def pending_writes(self) -> int:
-        return self._store.pending_writes
+        return self.transaction.pending
 
     # -- games --------------------------------------------------------
     def has_game(self, game_id: str) -> bool:
-        return game_id in self._game_index
+        row = self.connection.execute(
+            "SELECT 1 FROM games WHERE game_id = ?", (game_id,)).fetchone()
+        return row is not None
 
-    def game_ids(self) -> Iterable[str]:
-        return self._game_index.keys()
+    def game_ids(self) -> Iterator[str]:
+        for row in self.connection.execute("SELECT game_id FROM games"):
+            yield row["game_id"]
 
     def get_game(self, game_id: str) -> Optional[dict]:
-        doc_id = self._game_index.get(game_id)
-        if doc_id is None:
-            return None
-        return self._store.table(GAMES_TABLE).get(doc_id)
+        row = self.connection.execute(
+            "SELECT * FROM games WHERE game_id = ?", (game_id,)).fetchone()
+        return _row_to_game(row) if row else None
 
     def games(self) -> Iterator[dict]:
-        return iter(self._store.table(GAMES_TABLE).values())
+        """Stream every game. Never materialises the whole dataset."""
+        for row in self.connection.execute("SELECT * FROM games"):
+            yield _row_to_game(row)
 
     def count_games(self) -> int:
-        return len(self._game_index)
+        return self.connection.execute("SELECT COUNT(*) AS n FROM games").fetchone()["n"]
 
     def upsert_game(self, document: dict) -> None:
+        """Insert or merge a game. Fields the caller omits are preserved."""
         game_id = document["game_id"]
-        doc_id = self._game_index.get(game_id)
-        if doc_id is None:
-            self._game_index[game_id] = self._store.insert(GAMES_TABLE, document)
+        known = {key: document[key] for key in GAME_COLUMNS if key in document}
+        extra = {key: value for key, value in document.items()
+                 if key not in GAME_COLUMNS}
+
+        existing = self.connection.execute(
+            "SELECT * FROM games WHERE game_id = ?", (game_id,)).fetchone()
+        if existing is not None:
+            merged = {key: existing[key] for key in GAME_COLUMNS}
+            merged.update(known)
+            previous_extra = {}
+            if existing["extra"]:
+                try:
+                    previous_extra = json.loads(existing["extra"])
+                except ValueError:
+                    previous_extra = {}
+            previous_extra.update(extra)
+            extra = previous_extra
         else:
-            # Preserve fields written by other passes (e.g. rank enrichment).
-            existing = self._store.table(GAMES_TABLE)[doc_id]
-            existing.update(document)
-            self._store.mark_dirty()
+            merged = {key: None for key in GAME_COLUMNS}
+            merged.update(known)
+            merged["game_id"] = game_id
+
+        for column in _JSON_COLUMNS:
+            value = merged.get(column)
+            if not isinstance(value, str):
+                merged[column] = json.dumps(
+                    value if value is not None else ([] if column == "moves" else {}),
+                    ensure_ascii=False)
+
+        self._begin()
+        columns = list(GAME_COLUMNS) + ["extra"]
+        values = [merged.get(key) for key in GAME_COLUMNS]
+        values.append(json.dumps(extra, ensure_ascii=False) if extra else None)
+        placeholders = ", ".join("?" for _ in columns)
+        updates = ", ".join(f"{key}=excluded.{key}" for key in columns if key != "game_id")
+        self.connection.execute(
+            f"INSERT INTO games ({', '.join(columns)}) VALUES ({placeholders}) "
+            f"ON CONFLICT(game_id) DO UPDATE SET {updates}",
+            values,
+        )
+        self._mark_dirty()
 
     # -- crawl records ------------------------------------------------
     def has_record(self, game_id: str) -> bool:
-        return game_id in self._record_index
+        row = self.connection.execute(
+            "SELECT 1 FROM crawl_records WHERE game_id = ?", (game_id,)).fetchone()
+        return row is not None
 
     def get_record(self, game_id: str) -> Optional[CrawlRecord]:
-        doc_id = self._record_index.get(game_id)
-        if doc_id is None:
-            return None
-        return CrawlRecord(self._store.table(CRAWL_RECORDS_TABLE)[doc_id])
+        row = self.connection.execute(
+            "SELECT * FROM crawl_records WHERE game_id = ?", (game_id,)).fetchone()
+        return _row_to_record(row) if row else None
 
     def records(self) -> Iterator[CrawlRecord]:
-        for doc in self._store.table(CRAWL_RECORDS_TABLE).values():
-            yield CrawlRecord(doc)
+        for row in self.connection.execute("SELECT * FROM crawl_records"):
+            yield _row_to_record(row)
 
     def count_records(self) -> int:
-        return len(self._record_index)
+        return self.connection.execute(
+            "SELECT COUNT(*) AS n FROM crawl_records").fetchone()["n"]
 
-    def add_record(self, game_id: str, game_type: str, source_user: Optional[str]) -> bool:
+    def add_record(self, game_id: str, game_type: str,
+                   source_user: Optional[str]) -> bool:
         """Register a newly discovered game. Returns False if already known.
 
-        This is the only place a crawl record is created, so ``game_id``
-        uniqueness is enforced in exactly one code path (issue #4).
+        Uniqueness is the primary key's job, so a duplicate cannot be created
+        even if two writers raced (they cannot — see storage/lock.py — but the
+        guarantee no longer depends on that).
         """
-        if game_id in self._record_index:
-            return False
-        document = {
-            "game_id": game_id,
-            "game_type": game_type,
-            "source_user": source_user,
-            "discovered_at": isoformat(utcnow()),
-            "kif_status": STATUS_KIF_MISSING,
-            "has_kif_file": False,
-            "is_indexed": False,
-            "attempts": 0,
-            "next_retry_at": None,
-            "last_attempt_at": None,
-            "last_error": None,
-        }
-        self._record_index[game_id] = self._store.insert(CRAWL_RECORDS_TABLE, document)
-        return True
+        self._begin()
+        cursor = self.connection.execute(
+            "INSERT OR IGNORE INTO crawl_records "
+            "(game_id, game_type, source_user, discovered_at, kif_status, "
+            " has_kif_file, is_indexed, attempts) "
+            "VALUES (?, ?, ?, ?, ?, 0, 0, 0)",
+            (game_id, game_type, source_user, isoformat(utcnow()), STATUS_KIF_MISSING),
+        )
+        inserted = cursor.rowcount > 0
+        if inserted:
+            self._mark_dirty()
+        return inserted
 
     def update_record(self, game_id: str, **fields) -> None:
-        doc_id = self._record_index.get(game_id)
-        if doc_id is None:
-            self.add_record(game_id, fields.get("game_type", "sb"), fields.get("source_user"))
-            doc_id = self._record_index[game_id]
-        self._store.table(CRAWL_RECORDS_TABLE)[doc_id].update(fields)
-        self._store.mark_dirty()
+        if not self.has_record(game_id):
+            self.add_record(game_id, fields.get("game_type", "sb"),
+                            fields.get("source_user"))
+        columns = {key: value for key, value in fields.items()
+                   if key in RECORD_COLUMNS and key != "game_id"}
+        if not columns:
+            return
+        for key in ("has_kif_file", "is_indexed"):
+            if key in columns:
+                columns[key] = int(bool(columns[key]))
+        assignments = ", ".join(f"{key} = ?" for key in columns)
+        self._begin()
+        self.connection.execute(
+            f"UPDATE crawl_records SET {assignments} WHERE game_id = ?",
+            list(columns.values()) + [game_id],
+        )
+        self._mark_dirty()
 
     def mark_downloaded(self, game_id: str) -> None:
         self.update_record(
@@ -252,15 +363,34 @@ class KifuDatabase:
 
     def due_records(self, limit: Optional[int] = None,
                     now: Optional[datetime] = None) -> List[CrawlRecord]:
-        """Records ready for another download attempt, oldest schedule first."""
+        """Records ready for another download attempt, fewest attempts first.
+
+        Served by ``idx_records_due``; the old version read every record into
+        Python and sorted the lot on each call.
+        """
         moment = now or utcnow()
-        due = [record for record in self.records() if record.is_due(moment)]
-        due.sort(key=lambda r: (r.attempts, r.get("discovered_at") or ""))
-        return due[:limit] if limit else due
+        query = (
+            "SELECT * FROM crawl_records "
+            "WHERE kif_status NOT IN (?, ?) "
+            "  AND (next_retry_at IS NULL OR next_retry_at <= ?) "
+            "ORDER BY attempts ASC, discovered_at ASC"
+        )
+        params: list = [STATUS_INDEXED, STATUS_KIF_UNAVAILABLE, isoformat(moment)]
+        if limit:
+            query += " LIMIT ?"
+            params.append(limit)
+        return [_row_to_record(row) for row in self.connection.execute(query, params)]
 
     # -- reporting ----------------------------------------------------
     def status_counts(self) -> Dict[str, int]:
-        counts: Dict[str, int] = {}
-        for record in self.records():
-            counts[record.status] = counts.get(record.status, 0) + 1
-        return counts
+        rows = self.connection.execute(
+            "SELECT kif_status, COUNT(*) AS n FROM crawl_records GROUP BY kif_status")
+        return {row["kif_status"]: row["n"] for row in rows}
+
+    def size_bytes(self) -> int:
+        total = 0
+        for suffix in ("", "-wal", "-shm"):
+            candidate = Path(str(self.path) + suffix)
+            if candidate.is_file():
+                total += candidate.stat().st_size
+        return total

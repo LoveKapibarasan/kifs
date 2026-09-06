@@ -12,11 +12,12 @@ dependencies = [
     "httpx>=0.27",
     "orjson>=3.9",
     "python-dotenv>=1.0",
-    "tinydb>=4.8",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+# tinydb is a test-only dependency: it verifies that `kifs export` still
+# produces a file the old tooling can open.
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "tinydb>=4.8"]
 
 [project.scripts]
 kifs = "kifs.cli:main"

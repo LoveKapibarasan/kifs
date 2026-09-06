@@ -46,36 +46,49 @@ v1 では `index_to_nosql.py` が「ストレージ定義 + パーサ + 索引 +
 
 ## ストレージ
 
-`kifu_db.json` は `{テーブル名: {doc_id: ドキュメント}}` という TinyDB の形式のまま保存します。ただし読み書きは `BufferedJSONStore` が担当し、
+`data/kifs.sqlite3` に `games` / `crawl_records` / `users` / `meta` の4テーブルを持ちます (WAL、`synchronous=NORMAL`)。
 
-- 起動時に一度だけメモリへロード、
-- 変更はメモリ上、
-- N件 / T秒 / `close()` / SIGTERM でアトミック書き込み (tmp → fsync → rename)
+単一JSONをやめた理由は、コストがフォーマットではなく**構造**にあったためです。1つのJSONオブジェクトに全対局を入れる限り、読むには全部パースし、書くには全部シリアライズする必要があります。収集が回り始めると1日で 38k件/157MB/1.0秒 が 75k件/306MB/**34.5秒** になりました。
 
-とします。TinyDB の `Table._update_table` は1操作ごとにテーブル全体の dict を2回作り直すため、38k件規模では書き込み経路として使っていません。形式互換は `tests/test_storage.py::test_file_is_readable_by_tinydb` が実際に TinyDB で開いて検証します。
+| 操作 | JSON | SQLite |
+| --- | --- | --- |
+| 起動 | 全件パース | なし |
+| `has_game` | メモリ索引 (要全件ロード) | 主キー参照 |
+| `due_records` | 全件走査 + Pythonソート | `idx_records_due` のレンジスキャン |
+| `next_user` | 全件走査してdue queue再構築 | `idx_users_next` の LIMIT 1 |
+| メモリ | データ量に比例 | 定数 |
+
+### 単一ライタと共有トランザクション
+
+SQLite の書き込みは1接続だけです。`KifuDatabase` が接続と `Transaction` を所有し、`Frontier` はそれを**共有**します。別々に接続すると互いの `BEGIN` でデッドロックするためです。commit は N件 / T秒 / `close()` / SIGTERM で行います。
+
+`Transaction.commit()` は自前のフラグではなく `connection.in_transaction` を真とします。DDL やエラーロールバックがトランザクションを裏で終わらせることがあり、フラグだけを見ると `cannot commit - no transaction is active` で落ちるためです。
+
+### ユーザーのリース
+
+`next_user()` が pop からクエリになったため、選択しただけでは同じユーザーが返り続けます。クロールが例外で落ちると同一ユーザーを永久に回すことになるので、`claim_user()` は選択と同時に短いリース (既定15分) を張ります。失敗・中断したクロールはリース満了後に戻ってくるだけで、失われません。`mark_crawled()` がリースを本来の再訪間隔に置き換えます。
 
 ### クラッシュ時に何が起きるか
 
-未フラッシュの索引エントリは失われます。ただし `.kif` ファイルは取得直後にディスクへ書かれているため、次回起動時の `reconcile()` がディスクを正としてDBを再構築します。**もれは発生しません。**
+未コミットのトランザクション分は失われます。ただし `.kif` ファイルは取得直後にディスクへ書かれているため、次回起動時の `reconcile()` がディスクを正としてDBを再構築します。**もれは発生しません。**
+
+### 既存ツールとの互換
+
+`kifs export` が `{"_default": {...}, "crawl_records": {...}}` 形式の `kifu_db.json` を書き出します。`tests/test_storage.py::test_export_is_readable_by_tinydb` が実際に TinyDB で開いて検証しています。
 
 ## フロンティア
 
-```json
-{
-  "users": {
-    "takachang2": {
-      "first_seen_at": "...", "last_crawled_at": "...",
-      "next_crawl_at": "...", "games_found": 33, "crawls": 2
-    }
-  },
-  "pending": ["未巡回ユーザーを発見順に"],
-  "seed_cursor": 0
-}
+`users` テーブル (`user_id`, `first_seen_at`, `last_crawled_at`, `next_crawl_at`, `games_found`, `crawls`)。
+
+```sql
+SELECT user_id FROM users
+WHERE next_crawl_at IS NULL OR next_crawl_at <= :now
+ORDER BY next_crawl_at ASC, first_seen_at ASC LIMIT 1;
 ```
 
-- 未巡回ユーザーは `pending` の deque から発見順に処理。
-- 空になったら `next_crawl_at <= now` のユーザーを一度だけソートして `_due_queue` を作り直す。ユーザーごとに全走査しないための遅延再構築です。
-- ユーザーは削除されません。v1 の 50,000 件切り捨ては廃止しました。
+SQLite は `ORDER BY` で NULL を先頭に置くため、この1本のクエリで「未巡回ユーザー優先、次に再訪期限を最も過ぎたユーザー」という優先順位がそのまま得られます (`idx_users_next` が効きます)。
+
+ユーザーは削除されません。v1 の 50,000 件切り捨ては廃止しています。
 
 ## 並行実行
 
