@@ -50,7 +50,8 @@ def _save_snapshot(settings: Settings, snapshot: dict) -> None:
 
 def build_report(settings: Settings, persist: bool = True) -> dict:
     """Gather the numbers for one report, and record them as the new baseline."""
-    db = KifuDatabase(settings.db_path).open()
+    # The collector is normally running; a writer open would block on its lock.
+    db = KifuDatabase(settings.db_path, read_only=True).open()
     frontier = Frontier(db, recrawl_hours=settings.user_recrawl_hours)
     try:
         counts = db.status_counts()

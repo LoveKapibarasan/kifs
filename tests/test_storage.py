@@ -172,3 +172,28 @@ def test_close_is_idempotent(tmp_path):
     db.upsert_game({"game_id": "a"})
     db.close()
     db.close()
+
+
+def test_read_only_open_does_not_write(tmp_path):
+    """`kifs status` and `kifs report` run against a live collector; opening
+    for write made them fail with "database is locked"."""
+    path = tmp_path / "kifs.sqlite3"
+    writer = KifuDatabase(path, flush_every_writes=1).open()
+    writer.upsert_game({"game_id": "a"})
+    writer.flush(force=True)
+
+    # Hold a write transaction open, as the collector does between commits.
+    writer.upsert_game({"game_id": "b"})
+    writer.connection.execute("SELECT 1")
+
+    reader = KifuDatabase(path, read_only=True).open()
+    assert reader.count_games() >= 1
+    assert reader.status_counts() == {}
+    reader.close()
+    writer.close()
+
+
+def test_read_only_open_creates_a_missing_database(tmp_path):
+    db = KifuDatabase(tmp_path / "new.sqlite3", read_only=True).open()
+    assert db.count_games() == 0
+    db.close()

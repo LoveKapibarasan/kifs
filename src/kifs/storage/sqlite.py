@@ -86,20 +86,30 @@ CREATE TABLE IF NOT EXISTS meta (
 
 
 def connect(path: Path, read_only: bool = False) -> sqlite3.Connection:
-    """Open the database, creating the schema when it is new."""
+    """Open the database, creating the schema when it is new.
+
+    ``read_only`` matters while the collector is running: WAL lets readers work
+    without blocking, but only if they do not try to write. Creating the schema
+    and stamping ``meta`` are writes, and against a busy collector they fail
+    with "database is locked" — which is what ``kifs status`` and ``kifs
+    report`` used to do on every open.
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    fresh = not path.exists()
     connection = sqlite3.connect(path, timeout=30.0, isolation_level=None)
     connection.row_factory = sqlite3.Row
 
-    # WAL lets `kifs status` read while the collector writes.
-    connection.execute("PRAGMA journal_mode=WAL")
-    # NORMAL is durable across process crashes (only a host crash can lose the
-    # last transactions), and the reconcile pass repairs that from the .kif files.
-    connection.execute("PRAGMA synchronous=NORMAL")
-    connection.execute("PRAGMA foreign_keys=ON")
     connection.execute("PRAGMA busy_timeout=30000")
-    if not read_only:
+    connection.execute("PRAGMA foreign_keys=ON")
+    if not read_only or fresh:
+        # Setting journal_mode is itself a write; skip it for a reader on an
+        # existing file, which is already in WAL from whoever created it.
+        connection.execute("PRAGMA journal_mode=WAL")
+        # NORMAL is durable across process crashes (only a host crash can lose
+        # the last transactions), and the reconcile pass repairs that from the
+        # .kif files.
+        connection.execute("PRAGMA synchronous=NORMAL")
         connection.executescript(SCHEMA)
         connection.execute(
             "INSERT INTO meta(key, value) VALUES('schema_version', ?) "

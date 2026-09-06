@@ -35,12 +35,15 @@ from kifs.storage.database import (
 log = logging.getLogger("kifs")
 
 
-def _open_db(settings: Settings) -> KifuDatabase:
+def _open_db(settings: Settings, read_only: bool = False) -> KifuDatabase:
+    """Open the database. Read-only commands must say so: they run against a
+    live collector, and opening for write would block on its lock."""
     settings.ensure_dirs()
     return KifuDatabase(
         settings.db_path,
         flush_every_writes=settings.flush_every_writes,
         flush_every_seconds=settings.flush_every_seconds,
+        read_only=read_only,
     ).open()
 
 
@@ -131,7 +134,7 @@ def cmd_reconcile(args, settings: Settings) -> int:
 def cmd_search(args, settings: Settings) -> int:
     from kifs.query.search import search_games
 
-    db = _open_db(settings)
+    db = _open_db(settings, read_only=True)
     hits = search_games(
         db, game_id=args.game_id, player=args.player, sente=args.sente,
         gote=args.gote, result=args.result, min_moves=args.min_moves, limit=args.limit,
@@ -150,7 +153,7 @@ def cmd_search(args, settings: Settings) -> int:
 def cmd_stats(args, settings: Settings) -> int:
     from kifs.query.search import summarize
 
-    db = _open_db(settings)
+    db = _open_db(settings, read_only=True)
     report = summarize(db)
     print("\n=== Database ===")
     print(f"Games indexed      : {report['total_games']}")
@@ -175,7 +178,7 @@ def cmd_status(args, settings: Settings) -> int:
     """What the collector still has to do — the operational view (issue #2)."""
     from kifs.storage.frontier import Frontier
 
-    db = _open_db(settings)
+    db = _open_db(settings, read_only=True)
     frontier = Frontier(db, recrawl_hours=settings.user_recrawl_hours)
     counts = db.status_counts()
     due = len(db.due_records())
@@ -201,7 +204,7 @@ def cmd_status(args, settings: Settings) -> int:
 def cmd_export(args, settings: Settings) -> int:
     from kifs.storage.export import export_tinydb_json
 
-    db = _open_db(settings)
+    db = _open_db(settings, read_only=True)
     try:
         target = args.output or (settings.data_dir / "kifu_db.json")
         counts = export_tinydb_json(db, Path(target), include_records=not args.games_only,
