@@ -7,6 +7,7 @@
     kifs search         query indexed games
     kifs stats          dataset and crawl-status summary
     kifs status         operational snapshot (what the service has left to do)
+    kifs report         build the daily report; --send mails it
     kifs ranks fetch|annotate|backfill
     kifs secrets check|push
 """
@@ -196,6 +197,45 @@ def cmd_status(args, settings: Settings) -> int:
     return 0
 
 
+def cmd_report(args, settings: Settings) -> int:
+    """Build the daily report and, with --send, mail it (the systemd timer's job)."""
+    from kifs.notify.mailer import Mailer, MailError
+    from kifs.notify.report import build_report, render_html, render_text
+
+    resolve_credentials(settings, use_infisical=not args.no_infisical)
+    # --dry-run must not move the baseline, or the next real report would
+    # under-report the delta.
+    report = build_report(settings, persist=args.send)
+
+    if args.json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+    else:
+        print(render_text(report))
+
+    if not args.send:
+        return 0
+
+    mailer = Mailer(settings)
+    if not mailer.configured:
+        log.error("SMTP is not configured; expected SMTP_* and REPORT_TO from Infisical.")
+        return 2
+
+    total = report["current"]["games_indexed"]
+    added = report["delta"].get("games_indexed")
+    subject = f"[kifs] 日次レポート {total:,} 対局"
+    if added is not None:
+        subject += f" (+{added:,})"
+    if report["warnings"]:
+        subject = f"[kifs] ⚠ 日次レポート {total:,} 対局"
+
+    try:
+        mailer.send(subject, render_text(report), render_html(report), to=args.to)
+    except MailError as exc:
+        log.error("Could not send the report: %s", exc)
+        return 1
+    return 0
+
+
 def cmd_ranks(args, settings: Settings) -> int:
     from kifs.ranks.backfill import backfill_ranks
     from kifs.ranks.enrich import annotate_games, fetch_ranks
@@ -292,6 +332,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     status = sub.add_parser("status", help="Operational snapshot as JSON.")
     status.set_defaults(func=cmd_status)
+
+    report = sub.add_parser("report", help="Daily collection report.")
+    report.add_argument("--send", action="store_true", help="Mail it (what the timer does).")
+    report.add_argument("--to", default=None, help="Override the recipient.")
+    report.add_argument("--json", action="store_true", help="Print the raw numbers.")
+    report.set_defaults(func=cmd_report)
 
     ranks = sub.add_parser("ranks", help="Player rank enrichment.")
     ranks.add_argument("rank_action", choices=["fetch", "annotate", "backfill"])

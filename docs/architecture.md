@@ -80,3 +80,22 @@ v1 では `index_to_nosql.py` が「ストレージ定義 + パーサ + 索引 +
 ## 並行実行
 
 書き込みプロセスは常に1つです (`data/state/kifs.lock` の `flock`)。2つ目の `kifs serve` は起動を拒否して終了コード3を返します。読み取り専用コマンド (`status` / `stats` / `search`) はロックを取らないので、サービス稼働中でも実行できます。
+
+## 通知
+
+`kifs.notify` は収集パイプラインから片方向に呼ばれるだけで、逆向きの依存はありません。
+
+```
+pipeline/service.py ──> notify/alerts.py ──> notify/mailer.py
+cli.py (report)     ──> notify/report.py ──┘
+```
+
+設計上の約束が3つあります。
+
+1. **メールの失敗は収集を止めない。** `Alerter.fire()` は `MailError` を捕まえてログに落とし、`False` を返します。
+2. **同じ問題で何通も送らない。** アラートはキーごとにクールダウンを持ち、状態は `data/state/alerts.json` にあります。再起動してもクールダウンは維持されるため、クラッシュループが大量送信になりません。
+3. **解消したら次は即座に鳴る。** 対局が索引化されるたびに `cookie_expired` と `collection_stalled` のキーをクリアします。
+
+日次レポートの差分基準は `data/state/report_state.json` です。`build_report(persist=False)` (プレビュー) は基準を更新しないため、`kifs report` を何度実行しても翌日の差分は正しいままです。
+
+停止検知 (`collection_stalled`) が最も重要です。Cookieが失効したり巡回対象が枯渇したりしても `systemctl status` は `active (running)` のままで、外形からは健全なループと区別がつかないためです。

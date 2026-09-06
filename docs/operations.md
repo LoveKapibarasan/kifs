@@ -96,6 +96,36 @@ systemctl --user edit kifs-collector
 
 `KIFS_GAME_TYPES` を増やすと収集対象の持ち時間が増えますが、1ユーザーあたりのリクエスト数もその分増えます。
 
+## 日次レポートと通知
+
+```bash
+systemctl --user list-timers kifs-report.timer     # 次回送信時刻
+kifs report                                        # 送信せずにプレビュー
+kifs report --send                                 # 今すぐ送る
+kifs report --send --to someone@example.org        # 宛先を上書きして送る
+kifs report --json                                 # 生の数値
+journalctl --user -u kifs-report.service -n 30     # 送信ログ
+```
+
+タイマーは `OnCalendar=*-*-* 23:00:00 UTC` (= 08:00 JST) で、`Persistent=true` のためホストが停止していた場合は復帰後に送ります。
+
+レポートは「前回送信時からの差分」を出します。基準は `data/state/report_state.json` に保存され、**`--send` なしのプレビューでは基準を動かしません** (プレビューが差分を食い潰さないため)。
+
+送信時刻を変えるとき:
+
+```bash
+systemctl --user edit kifs-report.timer
+# [Timer]
+# OnCalendar=
+# OnCalendar=*-*-* 09:00:00 UTC
+```
+
+宛先を変えるときは Infisical の `REPORT_TO` を更新します (`kifs secrets push` は Cookie 用なので、REPORT_TO はダッシュボードか API で更新)。
+
+### 即時アラート
+
+`docs/architecture.md` の「通知」を参照。`KIFS_ALERTS_ENABLED=false` で無効化できます。
+
 ## バックアップ
 
 失って困るのは `~/kifs-data/` だけです。`kif/` があれば `kifs reconcile` でDBは再構築できるため、優先度は `kif/` > `state/` > `kifu_db.json` の順です。

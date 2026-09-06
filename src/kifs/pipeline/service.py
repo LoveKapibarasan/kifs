@@ -25,6 +25,12 @@ import httpx
 from kifs.clients.kishin import KishinAnalyticsClient
 from kifs.clients.shogiwars import AuthenticationError, ShogiWarsClient
 from kifs.config import Settings
+from kifs.notify.alerts import (
+    ALERT_COOKIE_EXPIRED,
+    ALERT_CYCLE_FAILING,
+    ALERT_STALLED,
+    Alerter,
+)
 from kifs.pipeline.discovery import Discovery
 from kifs.pipeline.downloader import Downloader
 from kifs.pipeline.indexer import reconcile
@@ -46,6 +52,7 @@ class Counters:
     games_retry_scheduled: int = 0
     retries_attempted: int = 0
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    last_index_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def summary(self) -> str:
         elapsed = (datetime.now(timezone.utc) - self.started_at).total_seconds()
@@ -73,6 +80,8 @@ class CollectorService:
             recrawl_hours=settings.user_recrawl_hours,
             flush_every_seconds=settings.flush_every_seconds,
         )
+        self.alerter = Alerter(settings)
+        self._consecutive_failures = 0
 
     # -- lifecycle ----------------------------------------------------
     def request_shutdown(self) -> None:
@@ -113,15 +122,35 @@ class CollectorService:
             try:
                 await self._session()
                 backoff = 5.0
+                self._consecutive_failures = 0
             except AuthenticationError as exc:
                 log.error("Session cookie rejected (%s). Credentials came from '%s'. "
                           "Refresh WEB_SESSION in Infisical, then restart.",
                           exc, self.settings.credential_source)
+                self.alerter.fire(
+                    ALERT_COOKIE_EXPIRED,
+                    "セッションCookieが拒否されました",
+                    f"将棋ウォーズのセッションCookieが拒否されました ({exc})。\n"
+                    f"認証情報の取得元: {self.settings.credential_source}\n\n"
+                    "収集は停止していませんが、Cookieを更新するまで新規対局は集まりません。\n"
+                    "対処:\n"
+                    "  1. ブラウザから新しい _web_session / sessionid を取得\n"
+                    "  2. export WEB_SESSION=... ANALYTICS_SESSION=... && kifs secrets push\n"
+                    "  3. systemctl --user restart kifs-collector",
+                )
                 self._persist(force=True)
                 await self._sleep(min(backoff * 12, 900.0))
                 backoff = min(backoff * 2, 300.0)
             except Exception as exc:
+                self._consecutive_failures += 1
                 log.exception("Cycle failed (%s); retrying in %.0fs.", exc, backoff)
+                if self._consecutive_failures >= 5:
+                    self.alerter.fire(
+                        ALERT_CYCLE_FAILING,
+                        "収集サイクルが連続で失敗しています",
+                        f"収集サイクルが {self._consecutive_failures} 回連続で失敗しました。\n"
+                        f"直近の例外: {type(exc).__name__}: {exc}",
+                    )
                 self._persist(force=True)
                 await self._sleep(backoff)
                 backoff = min(backoff * 2, 300.0)
@@ -143,6 +172,7 @@ class CollectorService:
             cycles = 0
             while self.running:
                 await self._cycle(discovery, downloader)
+                self._check_stalled()
                 cycles += 1
                 if self.max_cycles is not None and cycles >= self.max_cycles:
                     log.info("Reached max_cycles=%d; stopping.", self.max_cycles)
@@ -179,6 +209,10 @@ class CollectorService:
             if outcome == "indexed":
                 indexed_here += 1
                 self.counters.games_indexed += 1
+                self.counters.last_index_at = datetime.now(timezone.utc)
+                # Traffic is flowing again; let the next problem alert at once.
+                self.alerter.clear(ALERT_COOKIE_EXPIRED)
+                self.alerter.clear(ALERT_STALLED)
             elif outcome == "retry":
                 self.counters.games_retry_scheduled += 1
             await self._sleep(self.settings.request_delay)
@@ -188,6 +222,27 @@ class CollectorService:
             "%s: %d games seen, %d new, %d indexed | frontier %d known / %d unseen | %s",
             user_id, len(games), new_count, indexed_here,
             len(self.frontier), self.frontier.never_crawled, self.counters.summary(),
+        )
+
+    def _check_stalled(self) -> None:
+        """Alert when the collector is running but nothing is being collected.
+
+        A silent no-op loop looks identical to a healthy one in `systemctl
+        status`, so this is the condition most worth mailing about.
+        """
+        idle_minutes = (datetime.now(timezone.utc)
+                        - self.counters.last_index_at).total_seconds() / 60
+        if idle_minutes < self.settings.stall_minutes:
+            return
+        self.alerter.fire(
+            ALERT_STALLED,
+            f"収集が {idle_minutes:.0f} 分停止しています",
+            f"サービスは稼働中ですが、直近 {idle_minutes:.0f} 分で1件も索引化されていません。\n\n"
+            f"巡回済みユーザー: {self.counters.users_crawled}\n"
+            f"発見した対局    : {self.counters.games_discovered}\n"
+            f"索引化した対局  : {self.counters.games_indexed}\n"
+            f"再試行に回した数: {self.counters.games_retry_scheduled}\n\n"
+            "Cookieの失効、上流のレート制限、巡回対象ユーザーの枯渇などが考えられます。",
         )
 
     async def _drain_retries(self, downloader: Downloader) -> None:
@@ -205,6 +260,7 @@ class CollectorService:
                 record.game_id, record.get("source_user"), record.get("game_type"))
             if outcome == "indexed":
                 self.counters.games_indexed += 1
+                self.counters.last_index_at = datetime.now(timezone.utc)
             await self._sleep(self.settings.request_delay)
 
     async def _sleep(self, seconds: float) -> None:

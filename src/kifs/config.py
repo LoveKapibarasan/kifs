@@ -18,7 +18,17 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 #: Ordered credential sources. The first one that yields a value wins.
-CREDENTIAL_KEYS = ("WEB_SESSION", "ANALYTICS_SESSION")
+CREDENTIAL_KEYS = (
+    "WEB_SESSION",
+    "ANALYTICS_SESSION",
+    # Daily report / alert delivery (see kifs.notify).
+    "SMTP_SERVER",
+    "SMTP_PORT",
+    "SMTP_USERNAME",
+    "SMTP_PASSWORD",
+    "SMTP_FROM",
+    "REPORT_TO",
+)
 
 
 def _env_flag(name: str, default: bool) -> bool:
@@ -65,6 +75,19 @@ class Settings:
     analytics_session: Optional[str] = None
     credential_source: str = "unresolved"
 
+    # Notification (see kifs.notify). All of these come from Infisical too.
+    smtp_server: Optional[str] = None
+    smtp_port: int = 587
+    smtp_username: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from: Optional[str] = None
+    report_to: Optional[str] = None
+    #: Alert when nothing has been indexed for this long while the service runs.
+    stall_minutes: float = 90.0
+    #: Do not repeat the same alert more often than this.
+    alert_cooldown_hours: float = 6.0
+    alerts_enabled: bool = True
+
     # Crawl behaviour -------------------------------------------------
     game_types: List[str] = field(default_factory=lambda: ["sb"])
     #: Stop paging a user's history once a page yields no unseen game id.
@@ -83,6 +106,19 @@ class Settings:
     #: Flush the in-memory database after this many writes or seconds (issue #6).
     flush_every_writes: int = 200
     flush_every_seconds: float = 60.0
+
+    @property
+    def mail_configured(self) -> bool:
+        return bool(self.smtp_server and self.smtp_username
+                    and self.smtp_password and self.report_to)
+
+    @property
+    def alert_state_path(self) -> Path:
+        return self.state_dir / "alerts.json"
+
+    @property
+    def report_state_path(self) -> Path:
+        return self.state_dir / "report_state.json"
 
     @property
     def infisical_enabled(self) -> bool:
@@ -135,6 +171,11 @@ def load_settings() -> Settings:
     settings.flush_every_writes = _env_int("KIFS_FLUSH_EVERY_WRITES", settings.flush_every_writes)
     settings.flush_every_seconds = _env_float("KIFS_FLUSH_EVERY_SECONDS", settings.flush_every_seconds)
 
+    settings.stall_minutes = _env_float("KIFS_STALL_MINUTES", settings.stall_minutes)
+    settings.alert_cooldown_hours = _env_float(
+        "KIFS_ALERT_COOLDOWN_HOURS", settings.alert_cooldown_hours)
+    settings.alerts_enabled = _env_flag("KIFS_ALERTS_ENABLED", settings.alerts_enabled)
+
     seed_max = _env_int("KIFS_SEED_MAX_OFFSET", 500)
     settings.seed_offsets = list(range(1, seed_max + 1, 25))
 
@@ -175,5 +216,15 @@ def resolve_credentials(settings: Settings, use_infisical: bool = True) -> Setti
 
     settings.web_session = resolved.get("WEB_SESSION")
     settings.analytics_session = resolved.get("ANALYTICS_SESSION")
+    settings.smtp_server = resolved.get("SMTP_SERVER")
+    settings.smtp_username = resolved.get("SMTP_USERNAME")
+    settings.smtp_password = resolved.get("SMTP_PASSWORD")
+    settings.smtp_from = resolved.get("SMTP_FROM") or resolved.get("SMTP_USERNAME")
+    settings.report_to = resolved.get("REPORT_TO")
+    if resolved.get("SMTP_PORT"):
+        try:
+            settings.smtp_port = int(resolved["SMTP_PORT"])
+        except ValueError:
+            pass
     settings.credential_source = source if resolved else "missing"
     return settings

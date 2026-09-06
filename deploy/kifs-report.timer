@@ -1,0 +1,13 @@
+[Unit]
+Description=Daily KIF collection report at 08:00 JST
+Documentation=https://github.com/LoveKapibarasan/kifs
+
+[Timer]
+# The collector host runs on UTC; 23:00 UTC is 08:00 JST the next day.
+OnCalendar=*-*-* 23:00:00 UTC
+# Send as soon as the host is back if it was off at the scheduled time.
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
