@@ -28,6 +28,12 @@ CREDENTIAL_KEYS = (
     "SMTP_PASSWORD",
     "SMTP_FROM",
     "REPORT_TO",
+    # Silo (MinIO-compatible) object storage — see kifs.pipeline.upload.
+    "S3_ENDPOINT",
+    "S3_BUCKET",
+    "S3_REGION",
+    "S3_ACCESS_KEY",
+    "S3_SECRET_KEY",
 )
 
 
@@ -84,6 +90,17 @@ class Settings:
     smtp_password: Optional[str] = None
     smtp_from: Optional[str] = None
     report_to: Optional[str] = None
+    # Object storage (Silo). Uploaded KIFs are what other apps read.
+    s3_endpoint: Optional[str] = None
+    s3_bucket: Optional[str] = None
+    s3_region: str = "us-east-1"
+    s3_access_key: Optional[str] = None
+    s3_secret_key: Optional[str] = None
+    #: Object key prefix inside the bucket.
+    s3_prefix: str = "kif"
+    #: Files uploaded per sync run; keeps one run bounded.
+    s3_batch: int = 5000
+
     #: Alert when nothing has been indexed for this long while the service runs.
     stall_minutes: float = 90.0
     #: Do not repeat the same alert more often than this.
@@ -108,6 +125,11 @@ class Settings:
     #: Flush the in-memory database after this many writes or seconds (issue #6).
     flush_every_writes: int = 200
     flush_every_seconds: float = 60.0
+
+    @property
+    def s3_configured(self) -> bool:
+        return bool(self.s3_endpoint and self.s3_bucket
+                    and self.s3_access_key and self.s3_secret_key)
 
     @property
     def mail_configured(self) -> bool:
@@ -174,6 +196,8 @@ def load_settings() -> Settings:
     settings.flush_every_writes = _env_int("KIFS_FLUSH_EVERY_WRITES", settings.flush_every_writes)
     settings.flush_every_seconds = _env_float("KIFS_FLUSH_EVERY_SECONDS", settings.flush_every_seconds)
 
+    settings.s3_prefix = os.getenv("KIFS_S3_PREFIX", settings.s3_prefix).strip("/")
+    settings.s3_batch = _env_int("KIFS_S3_BATCH", settings.s3_batch)
     settings.stall_minutes = _env_float("KIFS_STALL_MINUTES", settings.stall_minutes)
     settings.alert_cooldown_hours = _env_float(
         "KIFS_ALERT_COOLDOWN_HOURS", settings.alert_cooldown_hours)
@@ -224,6 +248,12 @@ def resolve_credentials(settings: Settings, use_infisical: bool = True) -> Setti
     settings.smtp_password = resolved.get("SMTP_PASSWORD")
     settings.smtp_from = resolved.get("SMTP_FROM") or resolved.get("SMTP_USERNAME")
     settings.report_to = resolved.get("REPORT_TO")
+    settings.s3_endpoint = resolved.get("S3_ENDPOINT")
+    settings.s3_bucket = resolved.get("S3_BUCKET")
+    settings.s3_access_key = resolved.get("S3_ACCESS_KEY")
+    settings.s3_secret_key = resolved.get("S3_SECRET_KEY")
+    if resolved.get("S3_REGION"):
+        settings.s3_region = resolved["S3_REGION"]
     if resolved.get("SMTP_PORT"):
         try:
             settings.smtp_port = int(resolved["SMTP_PORT"])

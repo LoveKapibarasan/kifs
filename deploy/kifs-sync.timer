@@ -1,0 +1,14 @@
+[Unit]
+Description=Upload collected KIFs to object storage every hour
+Documentation=https://github.com/LoveKapibarasan/kifs
+
+[Timer]
+OnCalendar=hourly
+# Catch up after downtime rather than skipping an hour.
+Persistent=true
+# Keep the sync off the top of the hour, away from the collector's own bursts.
+RandomizedDelaySec=5min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

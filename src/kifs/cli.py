@@ -8,6 +8,7 @@
     kifs stats          dataset and crawl-status summary
     kifs status         operational snapshot (what the service has left to do)
     kifs report         build the daily report; --send mails it
+    kifs sync           upload collected KIFs to the Silo object store
     kifs export         write kifu_db.json (TinyDB format) from the database
     kifs migrate-sqlite import a v2 kifu_db.json + frontier.json into SQLite
     kifs ranks fetch|annotate|backfill
@@ -194,11 +195,42 @@ def cmd_status(args, settings: Settings) -> int:
         "records_by_status": counts,
         "records_due_now": due,
         "records_given_up": counts.get(STATUS_KIF_UNAVAILABLE, 0),
+        "uploaded_to_object_store": db.connection.execute(
+            "SELECT COUNT(*) AS n FROM crawl_records "
+            "WHERE uploaded_at IS NOT NULL").fetchone()["n"],
+        "upload_pending": db.connection.execute(
+            "SELECT COUNT(*) AS n FROM crawl_records "
+            "WHERE uploaded_at IS NULL AND kif_status = ? AND has_kif_file = 1",
+            (STATUS_INDEXED,)).fetchone()["n"],
         **frontier.stats(),
     }
     print(json.dumps(report, indent=2, ensure_ascii=False))
     db.close()
     return 0
+
+
+def cmd_sync(args, settings: Settings) -> int:
+    """Push KIFs to object storage (what the sync timer runs)."""
+    from kifs.clients.s3 import S3Error
+    from kifs.pipeline.upload import sync
+
+    resolve_credentials(settings, use_infisical=not args.no_infisical)
+    if not settings.s3_configured:
+        log.error("S3 is not configured; expected S3_ENDPOINT / S3_BUCKET / "
+                  "S3_ACCESS_KEY / S3_SECRET_KEY from Infisical.")
+        return 2
+
+    db = _open_db(settings)
+    try:
+        counts = sync(settings, db, limit=args.limit, verify=args.verify,
+                      dry_run=args.dry_run)
+    except S3Error as exc:
+        log.error("Sync failed: %s", exc)
+        return 1
+    finally:
+        db.close()
+    print(json.dumps(counts, indent=2))
+    return 0 if counts["failed"] == 0 else 1
 
 
 def cmd_export(args, settings: Settings) -> int:
@@ -378,6 +410,15 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--to", default=None, help="Override the recipient.")
     report.add_argument("--json", action="store_true", help="Print the raw numbers.")
     report.set_defaults(func=cmd_report)
+
+    sync_parser = sub.add_parser("sync", help="Upload KIFs to the object store.")
+    sync_parser.add_argument("--limit", type=int, default=None,
+                             help="Files to upload this run (default: KIFS_S3_BATCH).")
+    sync_parser.add_argument("--verify", action="store_true",
+                             help="List the bucket and re-derive the upload state first.")
+    sync_parser.add_argument("--dry-run", action="store_true",
+                             help="Report what would be uploaded.")
+    sync_parser.set_defaults(func=cmd_sync)
 
     export = sub.add_parser("export", help="Write the TinyDB-format kifu_db.json.")
     export.add_argument("--output", "-o", default=None, help="Target path.")

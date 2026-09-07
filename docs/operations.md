@@ -126,6 +126,38 @@ systemctl --user edit kifs-report.timer
 
 `docs/architecture.md` の「通知」を参照。`KIFS_ALERTS_ENABLED=false` で無効化できます。
 
+## オブジェクトストレージへの同期
+
+```bash
+systemctl --user list-timers kifs-sync.timer      # 次回同期
+kifs sync --dry-run                               # 未アップロード件数
+kifs sync                                         # 今すぐ同期
+kifs sync --limit 1000                            # 件数を絞って同期
+kifs sync --verify                                # バケットを列挙して状態を作り直す
+journalctl --user -u kifs-sync.service -n 30      # 同期ログ
+```
+
+1回の同期件数は `KIFS_S3_BATCH` (既定5000) で上限を設けています。バックログが大きいときは複数回に分かれますが、毎時実行なので自然に消化されます。
+
+`kifs status` の以下を見ます。
+
+```json
+"uploaded_to_object_store": 76134,
+"upload_pending": 0
+```
+
+`upload_pending` が増え続ける場合は Silo への到達性か認証情報を疑います。
+
+### バケットの中身を直接見る
+
+office-router 上で:
+
+```bash
+RP=$(docker inspect silo --format '{{range .Config.Env}}{{println .}}{{end}}' | grep '^MINIO_ROOT_PASSWORD=' | cut -d= -f2-)
+docker exec -e MC_HOST_local="http://minioadmin:${RP}@127.0.0.1:9000" silo mc ls local/kifs/kif/ | head
+docker exec -e MC_HOST_local="http://minioadmin:${RP}@127.0.0.1:9000" silo mc du local/kifs
+```
+
 ## バックアップ
 
 失って困るのは `~/kifs-data/` だけです。`kif/` があれば `kifs reconcile` でDBは再構築できるため、優先度は `kif/` > `kifs.sqlite3` > `state/` の順です。

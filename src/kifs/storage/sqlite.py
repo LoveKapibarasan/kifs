@@ -19,7 +19,7 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS games (
@@ -60,12 +60,17 @@ CREATE TABLE IF NOT EXISTS crawl_records (
     attempts        INTEGER NOT NULL DEFAULT 0,
     next_retry_at   TEXT,
     last_attempt_at TEXT,
-    last_error      TEXT
+    last_error      TEXT,
+    -- When this game's .kif was last pushed to object storage (NULL = pending).
+    uploaded_at     TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_records_status ON crawl_records(kif_status);
 -- Serves due_records(): the retry scheduler's only hot query.
 CREATE INDEX IF NOT EXISTS idx_records_due
     ON crawl_records(kif_status, next_retry_at, attempts);
+-- Serves the upload sync: "indexed but not yet in object storage".
+CREATE INDEX IF NOT EXISTS idx_records_upload
+    ON crawl_records(uploaded_at, kif_status);
 
 CREATE TABLE IF NOT EXISTS users (
     user_id         TEXT PRIMARY KEY,
@@ -111,12 +116,34 @@ def connect(path: Path, read_only: bool = False) -> sqlite3.Connection:
         # .kif files.
         connection.execute("PRAGMA synchronous=NORMAL")
         connection.executescript(SCHEMA)
+        _add_missing_columns(connection)
         connection.execute(
             "INSERT INTO meta(key, value) VALUES('schema_version', ?) "
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
             (str(SCHEMA_VERSION),),
         )
     return connection
+
+
+#: Columns added after the first release, applied to existing databases.
+_ADDED_COLUMNS = {
+    "crawl_records": {"uploaded_at": "TEXT"},
+}
+
+
+def _add_missing_columns(connection: sqlite3.Connection) -> None:
+    """Bring an existing database up to the current schema.
+
+    CREATE TABLE IF NOT EXISTS does nothing to a table that already exists, so
+    columns added later have to be applied explicitly.
+    """
+    for table, columns in _ADDED_COLUMNS.items():
+        existing = {row["name"] for row in
+                    connection.execute(f"PRAGMA table_info({table})")}
+        for name, column_type in columns.items():
+            if name not in existing:
+                connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {column_type}")
+                log.info("Schema: added %s.%s.", table, name)
 
 
 def get_meta(connection: sqlite3.Connection, key: str, default: str | None = None):

@@ -112,3 +112,18 @@ cli.py (report)     ──> notify/report.py ──┘
 日次レポートの差分基準は `data/state/report_state.json` です。`build_report(persist=False)` (プレビュー) は基準を更新しないため、`kifs report` を何度実行しても翌日の差分は正しいままです。
 
 停止検知 (`collection_stalled`) が最も重要です。Cookieが失効したり巡回対象が枯渇したりしても `systemctl status` は `active (running)` のままで、外形からは健全なループと区別がつかないためです。
+
+## オブジェクトストレージへの同期
+
+```
+cli.py (sync) ──> pipeline/upload.py ──> clients/s3.py ──> Silo (MinIO互換)
+                        └──> crawl_records.uploaded_at
+```
+
+`clients/s3.py` は SigV4 署名を自前で持ちます (PUT / HEAD / GET list のみ)。boto3 を入れると依存が一気に増えるため、コレクタの依存は httpx + orjson + python-dotenv のままにしてあります。アドレッシングはパススタイル (`<endpoint>/<bucket>/<key>`) で、バケットごとのDNSを必要としません。
+
+**署名対象と送信パスが一致していること**が重要です。キーの各セグメントを `quote(safe="")` でエスケープし、`/` 区切りだけを残しています。httpx はそのURLを再エンコードしないため二重エンコードは起きません (`tests/test_upload.py::test_keys_with_special_characters_are_escaped` が実際の wire path で検証)。
+
+未アップロードの判定は `crawl_records.uploaded_at IS NULL` で、`idx_records_upload` が効きます。毎回バケットを列挙する設計にしなかったのは、再試行スケジューラと同じ理由です。列挙が必要になるのは状態がずれたときだけなので、`--verify` として明示的に呼ぶ形にしています。
+
+アップロード失敗時は `uploaded_at` を NULL のままにします。「成功したものだけ記録する」ことで、取りこぼしが起きないようにしています。
