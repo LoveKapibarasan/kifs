@@ -447,6 +447,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[List[str]] = None) -> int:
+    from kifs.storage.sqlite import SchemaUpgradeBlocked
+
     args = build_parser().parse_args(argv)
     settings = load_settings()
     setup_logging(
@@ -454,7 +456,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         level=logging.DEBUG if args.verbose else logging.INFO,
         to_file=not args.no_log_file,
     )
-    return args.func(args, settings)
+    try:
+        return args.func(args, settings)
+    except SchemaUpgradeBlocked as exc:
+        log.error("%s", exc)
+        return 4
 
 
 if __name__ == "__main__":

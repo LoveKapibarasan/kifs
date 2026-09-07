@@ -236,3 +236,28 @@ def test_opening_an_older_database_adds_new_columns(tmp_path):
     assert "uploaded_at" in columns
     assert db.get_record("a")["uploaded_at"] is None, "existing rows stay pending"
     db.close()
+
+
+def test_blocked_schema_upgrade_says_what_to_do(tmp_path):
+    """ALTER TABLE needs exclusive access; a running collector denies it. The
+    operator should be told that, not "database is locked"."""
+    import sqlite3
+
+    from kifs.storage.sqlite import SchemaUpgradeBlocked
+
+    path = tmp_path / "old.sqlite3"
+    legacy = sqlite3.connect(path)
+    legacy.executescript("""
+        CREATE TABLE crawl_records (game_id TEXT PRIMARY KEY, kif_status TEXT NOT NULL);
+        CREATE TABLE games (game_id TEXT PRIMARY KEY, extra TEXT);
+        CREATE TABLE users (user_id TEXT PRIMARY KEY);
+        CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
+    """)
+    legacy.commit()
+    # Hold a write lock, as the collector does.
+    legacy.execute("BEGIN EXCLUSIVE")
+    legacy.execute("INSERT INTO meta VALUES ('x', 'y')")
+
+    with pytest.raises(SchemaUpgradeBlocked, match="[Ss]top the collector"):
+        KifuDatabase(path, flush_every_writes=1).open()
+    legacy.close()
