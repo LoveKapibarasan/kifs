@@ -19,9 +19,9 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
-SCHEMA = """
+SCHEMA_TABLES = """
 CREATE TABLE IF NOT EXISTS games (
     game_id      TEXT PRIMARY KEY,
     sente        TEXT,
@@ -43,11 +43,6 @@ CREATE TABLE IF NOT EXISTS games (
     crawler_ts   TEXT,
     extra        TEXT    -- JSON object for fields added later
 );
-CREATE INDEX IF NOT EXISTS idx_games_sente  ON games(sente);
-CREATE INDEX IF NOT EXISTS idx_games_gote   ON games(gote);
-CREATE INDEX IF NOT EXISTS idx_games_result ON games(result);
-CREATE INDEX IF NOT EXISTS idx_games_start  ON games(start_time);
-
 CREATE TABLE IF NOT EXISTS crawl_records (
     game_id         TEXT PRIMARY KEY,
     game_type       TEXT,
@@ -60,13 +55,10 @@ CREATE TABLE IF NOT EXISTS crawl_records (
     attempts        INTEGER NOT NULL DEFAULT 0,
     next_retry_at   TEXT,
     last_attempt_at TEXT,
-    last_error      TEXT
+    last_error      TEXT,
+    -- When this game's .kif was last pushed to object storage (NULL = pending).
+    uploaded_at     TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_records_status ON crawl_records(kif_status);
--- Serves due_records(): the retry scheduler's only hot query.
-CREATE INDEX IF NOT EXISTS idx_records_due
-    ON crawl_records(kif_status, next_retry_at, attempts);
-
 CREATE TABLE IF NOT EXISTS users (
     user_id         TEXT PRIMARY KEY,
     first_seen_at   TEXT,
@@ -75,13 +67,30 @@ CREATE TABLE IF NOT EXISTS users (
     games_found     INTEGER NOT NULL DEFAULT 0,
     crawls          INTEGER NOT NULL DEFAULT 0
 );
--- Serves next_user(): unseen users have next_crawl_at IS NULL and sort first.
-CREATE INDEX IF NOT EXISTS idx_users_next ON users(next_crawl_at);
-
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT
 );
+"""
+
+#: Created after :data:`_ADDED_COLUMNS` has been applied, because an index may
+#: reference a column that an older database does not have yet.
+SCHEMA_INDEXES = """
+CREATE INDEX IF NOT EXISTS idx_games_sente  ON games(sente);
+CREATE INDEX IF NOT EXISTS idx_games_gote   ON games(gote);
+CREATE INDEX IF NOT EXISTS idx_games_result ON games(result);
+CREATE INDEX IF NOT EXISTS idx_games_start  ON games(start_time);
+
+CREATE INDEX IF NOT EXISTS idx_records_status ON crawl_records(kif_status);
+-- Serves due_records(): the retry scheduler's only hot query.
+CREATE INDEX IF NOT EXISTS idx_records_due
+    ON crawl_records(kif_status, next_retry_at, attempts);
+-- Serves the upload sync: "indexed but not yet in object storage".
+CREATE INDEX IF NOT EXISTS idx_records_upload
+    ON crawl_records(uploaded_at, kif_status);
+
+-- Serves next_user(): unseen users have next_crawl_at IS NULL and sort first.
+CREATE INDEX IF NOT EXISTS idx_users_next ON users(next_crawl_at);
 """
 
 
@@ -100,23 +109,72 @@ def connect(path: Path, read_only: bool = False) -> sqlite3.Connection:
     connection = sqlite3.connect(path, timeout=30.0, isolation_level=None)
     connection.row_factory = sqlite3.Row
 
-    connection.execute("PRAGMA busy_timeout=30000")
     connection.execute("PRAGMA foreign_keys=ON")
     if not read_only or fresh:
-        # Setting journal_mode is itself a write; skip it for a reader on an
-        # existing file, which is already in WAL from whoever created it.
-        connection.execute("PRAGMA journal_mode=WAL")
-        # NORMAL is durable across process crashes (only a host crash can lose
-        # the last transactions), and the reconcile pass repairs that from the
-        # .kif files.
-        connection.execute("PRAGMA synchronous=NORMAL")
-        connection.executescript(SCHEMA)
-        connection.execute(
-            "INSERT INTO meta(key, value) VALUES('schema_version', ?) "
-            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-            (str(SCHEMA_VERSION),),
-        )
+        # Fail fast while setting up the schema: if another process holds the
+        # database there is nothing to wait for, and a clear error beats a
+        # 30-second hang. The normal timeout is restored below.
+        connection.execute("PRAGMA busy_timeout=2000")
+        try:
+            # Setting journal_mode is itself a write; skip it for a reader on an
+            # existing file, which is already in WAL from whoever created it.
+            connection.execute("PRAGMA journal_mode=WAL")
+            # NORMAL is durable across process crashes (only a host crash can
+            # lose the last transactions), and the reconcile pass repairs that
+            # from the .kif files.
+            connection.execute("PRAGMA synchronous=NORMAL")
+            connection.executescript(SCHEMA_TABLES)
+            _add_missing_columns(connection)
+            connection.executescript(SCHEMA_INDEXES)
+            # Only write when it actually changed: an unconditional upsert
+            # takes the write lock on every single open, which is enough to
+            # collide with the running collector.
+            current = connection.execute(
+                "SELECT value FROM meta WHERE key = 'schema_version'").fetchone()
+            if current is None or current["value"] != str(SCHEMA_VERSION):
+                connection.execute(
+                    "INSERT INTO meta(key, value) VALUES('schema_version', ?) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    (str(SCHEMA_VERSION),),
+                )
+        except sqlite3.OperationalError as exc:
+            if "locked" in str(exc) or "busy" in str(exc):
+                raise SchemaUpgradeBlocked(
+                    f"{exc}: the schema setup needs exclusive access to "
+                    f"{path.name}. Stop the collector first "
+                    f"(systemctl --user stop kifs-collector), then start it "
+                    f"again to apply the change."
+                ) from exc
+            raise
+    connection.execute("PRAGMA busy_timeout=30000")
     return connection
+
+
+class SchemaUpgradeBlocked(RuntimeError):
+    """A pending schema change could not be applied because a writer holds the DB."""
+
+
+#: Columns added after the first release, applied to existing databases.
+_ADDED_COLUMNS = {
+    "crawl_records": {"uploaded_at": "TEXT"},
+}
+
+
+def _add_missing_columns(connection: sqlite3.Connection) -> None:
+    """Bring an existing database up to the current schema.
+
+    CREATE TABLE IF NOT EXISTS does nothing to a table that already exists, so
+    columns added later have to be applied explicitly.
+    """
+    for table, columns in _ADDED_COLUMNS.items():
+        existing = {row["name"] for row in
+                    connection.execute(f"PRAGMA table_info({table})")}
+        for name, column_type in columns.items():
+            if name in existing:
+                continue
+            # A lock here is turned into SchemaUpgradeBlocked by connect().
+            connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {column_type}")
+            log.info("Schema: added %s.%s.", table, name)
 
 
 def get_meta(connection: sqlite3.Connection, key: str, default: str | None = None):

@@ -12,7 +12,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DATA_DIR="${KIFS_DATA_DIR:-$HOME/kifs-data}"
 UNIT_DIR="$HOME/.config/systemd/user"
 UNIT_NAME="kifs-collector.service"
-REPORT_UNITS=("kifs-report.service" "kifs-report.timer")
+TIMER_UNITS=("kifs-report.service" "kifs-report.timer")
 START=1
 
 for arg in "$@"; do
@@ -49,7 +49,7 @@ install_unit() {
       "$REPO_DIR/deploy/$1" > "$UNIT_DIR/$1"
 }
 install_unit "$UNIT_NAME"
-for unit in "${REPORT_UNITS[@]}"; do install_unit "$unit"; done
+for unit in "${TIMER_UNITS[@]}"; do install_unit "$unit"; done
 
 systemctl --user daemon-reload
 systemctl --user enable "$UNIT_NAME"
@@ -75,4 +75,6 @@ cat <<MSG
     report : systemctl --user list-timers kifs-report.timer
              KIFS_DATA_DIR=$DATA_DIR $REPO_DIR/.venv/bin/kifs report          # preview
              KIFS_DATA_DIR=$DATA_DIR $REPO_DIR/.venv/bin/kifs report --send   # send now
+    sync   : uploads run inside the collector; for a bulk backfill stop it and run
+             KIFS_DATA_DIR=$DATA_DIR $REPO_DIR/.venv/bin/kifs sync
 MSG

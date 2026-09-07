@@ -112,3 +112,24 @@ cli.py (report)     ──> notify/report.py ──┘
 日次レポートの差分基準は `data/state/report_state.json` です。`build_report(persist=False)` (プレビュー) は基準を更新しないため、`kifs report` を何度実行しても翌日の差分は正しいままです。
 
 停止検知 (`collection_stalled`) が最も重要です。Cookieが失効したり巡回対象が枯渇したりしても `systemctl status` は `active (running)` のままで、外形からは健全なループと区別がつかないためです。
+
+## オブジェクトストレージへの同期
+
+```
+pipeline/service.py ─┬─> pipeline/upload.py ──> clients/s3.py ──> Silo (MinIO互換)
+cli.py (sync)  ──────┘          └──> crawl_records.uploaded_at
+```
+
+アップロードは**コレクタのサイクル内**で動きます。専用のタイマーで別プロセスにしないのは、**SQLiteの書き込みが1プロセスに限られる**ためです。コレクタはコミット間隔の間ずっと書き込みトランザクションを保持するので、別プロセスの同期は `database is locked` を待ち続けることになります (実際に踏みました)。1サイクルあたりの件数を上限付きにして、クロールを止めないようにしています。
+
+同じ理由で、`connect()` が毎回 `meta` にスキーマバージョンを書き込んでいたのも問題でした。**DBを開くだけで書き込みロックを取る**ため、稼働中のコレクタと衝突します。現在は値が変わったときだけ書きます。
+
+オブジェクトストレージが落ちていても収集は止めません (`_drain_uploads` は例外をログに落として続行)。
+
+`clients/s3.py` は SigV4 署名を自前で持ちます (PUT / HEAD / GET list のみ)。boto3 を入れると依存が一気に増えるため、コレクタの依存は httpx + orjson + python-dotenv のままにしてあります。アドレッシングはパススタイル (`<endpoint>/<bucket>/<key>`) で、バケットごとのDNSを必要としません。
+
+**署名対象と送信パスが一致していること**が重要です。キーの各セグメントを `quote(safe="")` でエスケープし、`/` 区切りだけを残しています。httpx はそのURLを再エンコードしないため二重エンコードは起きません (`tests/test_upload.py::test_keys_with_special_characters_are_escaped` が実際の wire path で検証)。
+
+未アップロードの判定は `crawl_records.uploaded_at IS NULL` で、`idx_records_upload` が効きます。毎回バケットを列挙する設計にしなかったのは、再試行スケジューラと同じ理由です。列挙が必要になるのは状態がずれたときだけなので、`--verify` として明示的に呼ぶ形にしています。
+
+アップロード失敗時は `uploaded_at` を NULL のままにします。「成功したものだけ記録する」ことで、取りこぼしが起きないようにしています。

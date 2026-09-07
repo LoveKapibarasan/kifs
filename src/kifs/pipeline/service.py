@@ -34,6 +34,7 @@ from kifs.notify.alerts import (
 from kifs.pipeline.discovery import Discovery
 from kifs.pipeline.downloader import Downloader
 from kifs.pipeline.indexer import reconcile
+from kifs.pipeline.upload import sync as upload_sync
 from kifs.storage.database import KifuDatabase
 from kifs.storage.frontier import Frontier
 from kifs.storage.lock import ProcessLock
@@ -51,6 +52,7 @@ class Counters:
     games_indexed: int = 0
     games_retry_scheduled: int = 0
     retries_attempted: int = 0
+    games_uploaded: int = 0
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     last_index_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -59,14 +61,15 @@ class Counters:
         rate = self.games_indexed / elapsed * 3600 if elapsed > 0 else 0.0
         return (f"users={self.users_crawled} discovered={self.games_discovered} "
                 f"indexed={self.games_indexed} retry={self.games_retry_scheduled} "
-                f"({rate:.0f} games/h)")
+                f"uploaded={self.games_uploaded} ({rate:.0f} games/h)")
 
 
 class CollectorService:
     def __init__(self, settings: Settings, retry_batch: int = 50,
-                 max_cycles: Optional[int] = None):
+                 max_cycles: Optional[int] = None, upload_batch: int = 300):
         self.settings = settings
         self.retry_batch = retry_batch
+        self.upload_batch = upload_batch
         self.max_cycles = max_cycles
         self.running = True
         self.counters = Counters()
@@ -213,12 +216,32 @@ class CollectorService:
                 self.counters.games_retry_scheduled += 1
             await self._sleep(self.settings.request_delay)
 
+        self._drain_uploads()
         self.frontier.mark_crawled(user_id, new_count)
         log.info(
             "%s: %d games seen, %d new, %d indexed | frontier %d known / %d unseen | %s",
             user_id, len(games), new_count, indexed_here,
             len(self.frontier), self.frontier.never_crawled, self.counters.summary(),
         )
+
+    def _drain_uploads(self) -> None:
+        """Push newly collected KIFs to object storage.
+
+        This runs inside the collector rather than as its own timer because
+        SQLite takes a single writer: a separate sync process would spend its
+        time waiting for this one's write lock. The batch is bounded so a large
+        backlog does not stall crawling — for a bulk backfill, stop the service
+        and run `kifs sync` instead.
+        """
+        if not self.settings.s3_configured:
+            return
+        try:
+            counts = upload_sync(self.settings, self.db, limit=self.upload_batch)
+        except Exception as exc:
+            # Object storage being down must not stop collection.
+            log.warning("Upload to object storage failed: %s", exc)
+            return
+        self.counters.games_uploaded += counts["uploaded"]
 
     def _check_stalled(self) -> None:
         """Alert when the collector is running but nothing is being collected.

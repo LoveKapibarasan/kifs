@@ -80,10 +80,49 @@ kifs reconcile                   # ディスク上の .kif とDBを突き合わ�
 kifs status                      # 収集状況をJSONで出力
 kifs stats                       # データセットの統計
 kifs search --player takachang2 --min-moves 100
+kifs sync                        # 収集済みKIFをオブジェクトストレージへ同期
+kifs sync --dry-run              # 何件上がるかだけ確認
+kifs sync --verify               # バケットを実際に見て同期状態を作り直す
 kifs report                      # 日次レポートをプレビュー
 kifs report --send               # メール送信 (systemd timer が実行するもの)
 kifs ranks fetch|annotate|backfill
 ```
+
+## オブジェクトストレージ (Silo)
+
+収集した `.kif` は Silo (MinIO互換, S3 API) に上げます。他のアプリはコレクタのディスクではなく**ここから読みます**。
+
+```
+bucket kifs/
+└── kif/<game_id>.kif
+```
+
+アップロードは**コレクタのサイクル内**で行います (ユーザーを1人巡回するごとに最大300件)。専用タイマーにしなかったのは、**SQLiteの書き込みが1プロセスに限られる**ためです。別プロセスの同期はコレクタの書き込みロック待ちに終始します。
+
+どのファイルが未アップロードかは `crawl_records.uploaded_at` で追跡するため、1回の同期は索引を引く1クエリで済み、バケット全体の列挙は行いません。
+
+大量のバックログを一気に上げる場合は、コレクタを止めてから実行します。
+
+```bash
+systemctl --user stop kifs-collector
+kifs sync
+systemctl --user start kifs-collector
+```
+
+- アップロードに失敗したファイルは `uploaded_at` を NULL のままにするので、次回に必ず再送されます。
+- ローカルの状態とバケットがずれた場合 (バケットを手で空にした、PUT とフラグ書き込みの間で落ちた) は `kifs sync --verify` がバケットを列挙して状態を作り直します。列挙は重いので、通常の同期では行いません。
+- 進捗は `kifs status` の `uploaded_to_object_store` / `upload_pending` で見られます。
+
+### 他のアプリからの読み取り
+
+読み取り専用の認証情報が Infisical の Kifs プロジェクトに入っています (`S3_READ_ACCESS_KEY` / `S3_READ_SECRET_KEY`)。バケット `kifs` の GET と ListBucket のみが許可されており、書き込みは 403 になります。
+
+| 用途 | エンドポイント |
+| --- | --- |
+| 社内ネットワークから | `http://172.25.50.1:9002` (`S3_ENDPOINT`) |
+| 外部 / DNSが引ける環境から | `https://s3.lovekapibarasan.org` (`S3_PUBLIC_ENDPOINT`) |
+
+boto3 / mc / rclone の具体的な接続例は **[docs/object-storage.md](docs/object-storage.md)** にあります。
 
 ## 通知
 

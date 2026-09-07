@@ -197,3 +197,67 @@ def test_read_only_open_creates_a_missing_database(tmp_path):
     db = KifuDatabase(tmp_path / "new.sqlite3", read_only=True).open()
     assert db.count_games() == 0
     db.close()
+
+
+def test_opening_an_older_database_adds_new_columns(tmp_path):
+    """A database created before `uploaded_at` existed must upgrade cleanly.
+
+    The first attempt created the indexes before the columns, so opening a real
+    v1 database failed with "no such column: uploaded_at".
+    """
+    import sqlite3
+
+    path = tmp_path / "old.sqlite3"
+    legacy = sqlite3.connect(path)
+    legacy.executescript("""
+        CREATE TABLE games (game_id TEXT PRIMARY KEY, sente TEXT, gote TEXT,
+            sente_rank TEXT, gote_rank TEXT, sente_rating REAL, gote_rating REAL,
+            start_time TEXT, end_time TEXT, location TEXT, handicap TEXT,
+            result TEXT, total_moves INTEGER, moves TEXT, raw_headers TEXT,
+            crawler_user TEXT, crawler_type TEXT, crawler_ts TEXT, extra TEXT);
+        CREATE TABLE crawl_records (game_id TEXT PRIMARY KEY, game_type TEXT,
+            source_user TEXT, discovered_at TEXT, kif_status TEXT NOT NULL,
+            has_kif_file INTEGER NOT NULL DEFAULT 0,
+            is_indexed INTEGER NOT NULL DEFAULT 0, indexed_at TEXT,
+            attempts INTEGER NOT NULL DEFAULT 0, next_retry_at TEXT,
+            last_attempt_at TEXT, last_error TEXT);
+        CREATE TABLE users (user_id TEXT PRIMARY KEY, first_seen_at TEXT,
+            last_crawled_at TEXT, next_crawl_at TEXT,
+            games_found INTEGER NOT NULL DEFAULT 0, crawls INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
+        INSERT INTO crawl_records (game_id, kif_status) VALUES ('a', 'indexed');
+    """)
+    legacy.commit()
+    legacy.close()
+
+    db = KifuDatabase(path).open()
+    columns = {row["name"] for row in
+               db.connection.execute("PRAGMA table_info(crawl_records)")}
+    assert "uploaded_at" in columns
+    assert db.get_record("a")["uploaded_at"] is None, "existing rows stay pending"
+    db.close()
+
+
+def test_blocked_schema_upgrade_says_what_to_do(tmp_path):
+    """ALTER TABLE needs exclusive access; a running collector denies it. The
+    operator should be told that, not "database is locked"."""
+    import sqlite3
+
+    from kifs.storage.sqlite import SchemaUpgradeBlocked
+
+    path = tmp_path / "old.sqlite3"
+    legacy = sqlite3.connect(path)
+    legacy.executescript("""
+        CREATE TABLE crawl_records (game_id TEXT PRIMARY KEY, kif_status TEXT NOT NULL);
+        CREATE TABLE games (game_id TEXT PRIMARY KEY, extra TEXT);
+        CREATE TABLE users (user_id TEXT PRIMARY KEY);
+        CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
+    """)
+    legacy.commit()
+    # Hold a write lock, as the collector does.
+    legacy.execute("BEGIN EXCLUSIVE")
+    legacy.execute("INSERT INTO meta VALUES ('x', 'y')")
+
+    with pytest.raises(SchemaUpgradeBlocked, match="[Ss]top the collector"):
+        KifuDatabase(path, flush_every_writes=1).open()
+    legacy.close()
