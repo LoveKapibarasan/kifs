@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 2
 
-SCHEMA = """
+SCHEMA_TABLES = """
 CREATE TABLE IF NOT EXISTS games (
     game_id      TEXT PRIMARY KEY,
     sente        TEXT,
@@ -43,11 +43,6 @@ CREATE TABLE IF NOT EXISTS games (
     crawler_ts   TEXT,
     extra        TEXT    -- JSON object for fields added later
 );
-CREATE INDEX IF NOT EXISTS idx_games_sente  ON games(sente);
-CREATE INDEX IF NOT EXISTS idx_games_gote   ON games(gote);
-CREATE INDEX IF NOT EXISTS idx_games_result ON games(result);
-CREATE INDEX IF NOT EXISTS idx_games_start  ON games(start_time);
-
 CREATE TABLE IF NOT EXISTS crawl_records (
     game_id         TEXT PRIMARY KEY,
     game_type       TEXT,
@@ -64,14 +59,6 @@ CREATE TABLE IF NOT EXISTS crawl_records (
     -- When this game's .kif was last pushed to object storage (NULL = pending).
     uploaded_at     TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_records_status ON crawl_records(kif_status);
--- Serves due_records(): the retry scheduler's only hot query.
-CREATE INDEX IF NOT EXISTS idx_records_due
-    ON crawl_records(kif_status, next_retry_at, attempts);
--- Serves the upload sync: "indexed but not yet in object storage".
-CREATE INDEX IF NOT EXISTS idx_records_upload
-    ON crawl_records(uploaded_at, kif_status);
-
 CREATE TABLE IF NOT EXISTS users (
     user_id         TEXT PRIMARY KEY,
     first_seen_at   TEXT,
@@ -80,13 +67,30 @@ CREATE TABLE IF NOT EXISTS users (
     games_found     INTEGER NOT NULL DEFAULT 0,
     crawls          INTEGER NOT NULL DEFAULT 0
 );
--- Serves next_user(): unseen users have next_crawl_at IS NULL and sort first.
-CREATE INDEX IF NOT EXISTS idx_users_next ON users(next_crawl_at);
-
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT
 );
+"""
+
+#: Created after :data:`_ADDED_COLUMNS` has been applied, because an index may
+#: reference a column that an older database does not have yet.
+SCHEMA_INDEXES = """
+CREATE INDEX IF NOT EXISTS idx_games_sente  ON games(sente);
+CREATE INDEX IF NOT EXISTS idx_games_gote   ON games(gote);
+CREATE INDEX IF NOT EXISTS idx_games_result ON games(result);
+CREATE INDEX IF NOT EXISTS idx_games_start  ON games(start_time);
+
+CREATE INDEX IF NOT EXISTS idx_records_status ON crawl_records(kif_status);
+-- Serves due_records(): the retry scheduler's only hot query.
+CREATE INDEX IF NOT EXISTS idx_records_due
+    ON crawl_records(kif_status, next_retry_at, attempts);
+-- Serves the upload sync: "indexed but not yet in object storage".
+CREATE INDEX IF NOT EXISTS idx_records_upload
+    ON crawl_records(uploaded_at, kif_status);
+
+-- Serves next_user(): unseen users have next_crawl_at IS NULL and sort first.
+CREATE INDEX IF NOT EXISTS idx_users_next ON users(next_crawl_at);
 """
 
 
@@ -115,8 +119,9 @@ def connect(path: Path, read_only: bool = False) -> sqlite3.Connection:
         # the last transactions), and the reconcile pass repairs that from the
         # .kif files.
         connection.execute("PRAGMA synchronous=NORMAL")
-        connection.executescript(SCHEMA)
+        connection.executescript(SCHEMA_TABLES)
         _add_missing_columns(connection)
+        connection.executescript(SCHEMA_INDEXES)
         connection.execute(
             "INSERT INTO meta(key, value) VALUES('schema_version', ?) "
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
