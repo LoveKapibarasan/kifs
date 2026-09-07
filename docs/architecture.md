@@ -116,9 +116,15 @@ cli.py (report)     ──> notify/report.py ──┘
 ## オブジェクトストレージへの同期
 
 ```
-cli.py (sync) ──> pipeline/upload.py ──> clients/s3.py ──> Silo (MinIO互換)
-                        └──> crawl_records.uploaded_at
+pipeline/service.py ─┬─> pipeline/upload.py ──> clients/s3.py ──> Silo (MinIO互換)
+cli.py (sync)  ──────┘          └──> crawl_records.uploaded_at
 ```
+
+アップロードは**コレクタのサイクル内**で動きます。専用のタイマーで別プロセスにしないのは、**SQLiteの書き込みが1プロセスに限られる**ためです。コレクタはコミット間隔の間ずっと書き込みトランザクションを保持するので、別プロセスの同期は `database is locked` を待ち続けることになります (実際に踏みました)。1サイクルあたりの件数を上限付きにして、クロールを止めないようにしています。
+
+同じ理由で、`connect()` が毎回 `meta` にスキーマバージョンを書き込んでいたのも問題でした。**DBを開くだけで書き込みロックを取る**ため、稼働中のコレクタと衝突します。現在は値が変わったときだけ書きます。
+
+オブジェクトストレージが落ちていても収集は止めません (`_drain_uploads` は例外をログに落として続行)。
 
 `clients/s3.py` は SigV4 署名を自前で持ちます (PUT / HEAD / GET list のみ)。boto3 を入れると依存が一気に増えるため、コレクタの依存は httpx + orjson + python-dotenv のままにしてあります。アドレッシングはパススタイル (`<endpoint>/<bucket>/<key>`) で、バケットごとのDNSを必要としません。
 

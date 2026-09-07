@@ -97,7 +97,17 @@ bucket kifs/
 └── kif/<game_id>.kif
 ```
 
-`kifs-sync.timer` が毎時同期します (`RandomizedDelaySec=5min`、`Persistent=true`)。どのファイルが未アップロードかは `crawl_records.uploaded_at` で追跡するため、1回の同期は索引を引く1クエリで済み、バケット全体の列挙は行いません。
+アップロードは**コレクタのサイクル内**で行います (ユーザーを1人巡回するごとに最大300件)。専用タイマーにしなかったのは、**SQLiteの書き込みが1プロセスに限られる**ためです。別プロセスの同期はコレクタの書き込みロック待ちに終始します。
+
+どのファイルが未アップロードかは `crawl_records.uploaded_at` で追跡するため、1回の同期は索引を引く1クエリで済み、バケット全体の列挙は行いません。
+
+大量のバックログを一気に上げる場合は、コレクタを止めてから実行します。
+
+```bash
+systemctl --user stop kifs-collector
+kifs sync
+systemctl --user start kifs-collector
+```
 
 - アップロードに失敗したファイルは `uploaded_at` を NULL のままにするので、次回に必ず再送されます。
 - ローカルの状態とバケットがずれた場合 (バケットを手で空にした、PUT とフラグ書き込みの間で落ちた) は `kifs sync --verify` がバケットを列挙して状態を作り直します。列挙は重いので、通常の同期では行いません。

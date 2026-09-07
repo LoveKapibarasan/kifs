@@ -232,3 +232,47 @@ def test_keys_with_special_characters_are_escaped(bucket):
     paths = [path for _, path in bucket.requests]
     assert "/kifs/kif/a%20b%2Bc-1.kif" in paths
     assert not any("%25" in path for path in paths), "double-encoded"
+
+
+def test_collector_uploads_as_part_of_its_cycle(s3_settings, bucket, monkeypatch):
+    """Uploads run inside the collector because SQLite takes a single writer;
+    a separate sync process would only wait for the collector's write lock."""
+    from kifs.pipeline.service import CollectorService
+
+    service = CollectorService(s3_settings, upload_batch=10)
+    service.db.open()
+    for game_id in ("a-b-1", "c-d-2"):
+        s3_settings.kif_path(game_id).write_text("先手：x\n", encoding="utf-8")
+        service.db.add_record(game_id, "sb", "u")
+        service.db.mark_indexed(game_id)
+    service.db.flush(force=True)
+
+    service._drain_uploads()
+
+    assert set(bucket.objects) == {"kif/a-b-1.kif", "kif/c-d-2.kif"}
+    assert service.counters.games_uploaded == 2
+    service.db.close()
+
+
+def test_object_storage_being_down_does_not_stop_collection(s3_settings, monkeypatch):
+    from kifs.pipeline.service import CollectorService
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("silo unreachable")
+
+    monkeypatch.setattr("kifs.pipeline.service.upload_sync", boom)
+    service = CollectorService(s3_settings)
+    service.db.open()
+    service._drain_uploads()          # must not raise
+    assert service.counters.games_uploaded == 0
+    service.db.close()
+
+
+def test_uploads_are_skipped_when_s3_is_unconfigured(settings, bucket):
+    from kifs.pipeline.service import CollectorService
+
+    service = CollectorService(settings)
+    service.db.open()
+    service._drain_uploads()
+    assert bucket.objects == {}
+    service.db.close()

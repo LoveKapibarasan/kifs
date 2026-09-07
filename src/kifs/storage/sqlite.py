@@ -126,11 +126,17 @@ def connect(path: Path, read_only: bool = False) -> sqlite3.Connection:
             connection.executescript(SCHEMA_TABLES)
             _add_missing_columns(connection)
             connection.executescript(SCHEMA_INDEXES)
-            connection.execute(
-                "INSERT INTO meta(key, value) VALUES('schema_version', ?) "
-                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                (str(SCHEMA_VERSION),),
-            )
+            # Only write when it actually changed: an unconditional upsert
+            # takes the write lock on every single open, which is enough to
+            # collide with the running collector.
+            current = connection.execute(
+                "SELECT value FROM meta WHERE key = 'schema_version'").fetchone()
+            if current is None or current["value"] != str(SCHEMA_VERSION):
+                connection.execute(
+                    "INSERT INTO meta(key, value) VALUES('schema_version', ?) "
+                    "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    (str(SCHEMA_VERSION),),
+                )
         except sqlite3.OperationalError as exc:
             if "locked" in str(exc) or "busy" in str(exc):
                 raise SchemaUpgradeBlocked(

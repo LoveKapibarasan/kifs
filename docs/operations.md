@@ -128,16 +128,18 @@ systemctl --user edit kifs-report.timer
 
 ## オブジェクトストレージへの同期
 
-```bash
-systemctl --user list-timers kifs-sync.timer      # 次回同期
-kifs sync --dry-run                               # 未アップロード件数
-kifs sync                                         # 今すぐ同期
-kifs sync --limit 1000                            # 件数を絞って同期
-kifs sync --verify                                # バケットを列挙して状態を作り直す
-journalctl --user -u kifs-sync.service -n 30      # 同期ログ
-```
+アップロードはコレクタのサイクル内で自動的に行われます (1ユーザーごとに最大300件)。ログには `uploaded=` が出ます。
 
-1回の同期件数は `KIFS_S3_BATCH` (既定5000) で上限を設けています。バックログが大きいときは複数回に分かれますが、毎時実行なので自然に消化されます。
+手動で動かす場合、**コレクタを止めてから**実行します。SQLiteは書き込み1プロセスなので、稼働中に実行するとロック待ちになります。
+
+```bash
+systemctl --user stop kifs-collector
+kifs sync --dry-run                               # 未アップロード件数
+kifs sync                                         # 上限 KIFS_S3_BATCH (既定5000) 件
+kifs sync --limit 100000                          # バックログを一気に
+kifs sync --verify                                # バケットを列挙して状態を作り直す
+systemctl --user start kifs-collector
+```
 
 `kifs status` の以下を見ます。
 

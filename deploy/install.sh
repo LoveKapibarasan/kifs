@@ -12,8 +12,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DATA_DIR="${KIFS_DATA_DIR:-$HOME/kifs-data}"
 UNIT_DIR="$HOME/.config/systemd/user"
 UNIT_NAME="kifs-collector.service"
-TIMER_UNITS=("kifs-report.service" "kifs-report.timer"
-             "kifs-sync.service" "kifs-sync.timer")
+TIMER_UNITS=("kifs-report.service" "kifs-report.timer")
 START=1
 
 for arg in "$@"; do
@@ -54,9 +53,8 @@ for unit in "${TIMER_UNITS[@]}"; do install_unit "$unit"; done
 
 systemctl --user daemon-reload
 systemctl --user enable "$UNIT_NAME"
-# These are timers; enabling the .service units would run them at boot instead.
+# The daily report is a timer; enabling the .service itself would run it at boot.
 systemctl --user enable --now kifs-report.timer
-systemctl --user enable --now kifs-sync.timer
 
 # Keep the service alive across logout/reboot without an interactive session.
 loginctl enable-linger "$USER" 2>/dev/null || \
@@ -74,8 +72,9 @@ cat <<MSG
     logs   : journalctl --user -u $UNIT_NAME -f
     status : KIFS_DATA_DIR=$DATA_DIR $REPO_DIR/.venv/bin/kifs status
     stop   : systemctl --user stop $UNIT_NAME
-    timers : systemctl --user list-timers kifs-report.timer kifs-sync.timer
+    report : systemctl --user list-timers kifs-report.timer
              KIFS_DATA_DIR=$DATA_DIR $REPO_DIR/.venv/bin/kifs report          # preview
              KIFS_DATA_DIR=$DATA_DIR $REPO_DIR/.venv/bin/kifs report --send   # send now
-    sync   : KIFS_DATA_DIR=$DATA_DIR $REPO_DIR/.venv/bin/kifs sync --dry-run
+    sync   : uploads run inside the collector; for a bulk backfill stop it and run
+             KIFS_DATA_DIR=$DATA_DIR $REPO_DIR/.venv/bin/kifs sync
 MSG
