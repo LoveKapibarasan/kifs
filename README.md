@@ -122,7 +122,7 @@ systemctl --user start kifs-collector
 | 社内ネットワークから | `http://172.25.50.1:9002` (`S3_ENDPOINT`) |
 | 外部 / DNSが引ける環境から | `https://s3.lovekapibarasan.org` (`S3_PUBLIC_ENDPOINT`) |
 
-パススタイル (`<endpoint>/kifs/kif/<game_id>.kif`) でアクセスします。
+boto3 / mc / rclone の具体的な接続例は **[docs/object-storage.md](docs/object-storage.md)** にあります。
 
 ## 通知
 
