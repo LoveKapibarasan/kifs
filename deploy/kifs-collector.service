@@ -6,7 +6,6 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=%i
 WorkingDirectory=%h/kifs
 Environment=KIFS_DATA_DIR=%h/kifs-data
 Environment=PYTHONUNBUFFERED=1
